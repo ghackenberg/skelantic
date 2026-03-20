@@ -65,7 +65,7 @@ If you are adding a new core feature:
 
 ## 📦 Release Workflow
 
-Skelantic uses GitHub Actions to automate the release process to PyPI via Trusted Publishing. The project uses `setuptools_scm` for dynamic versioning, so you **do not** need to manually update a version number in a file. The Git tag is the single source of truth for the version.
+Skelantic uses GitHub Actions to automate the release process to PyPI via Trusted Publishing. The project uses `hatch-vcs` for dynamic versioning, so you **do not** need to manually update a version number in a file. The Git tag is the single source of truth for the version.
 
 To release a new version:
 
