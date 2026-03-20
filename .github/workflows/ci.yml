@@ -48,7 +48,7 @@ jobs:
     # Modern PyPI authentication using Trusted Publishing (OIDC)
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     steps:
     - uses: actions/checkout@v4
