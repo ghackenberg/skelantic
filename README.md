@@ -49,7 +49,7 @@ directories:
 
 ### 3. Write a Skeletal Template
 
-Skeletal Templates verify the contents of text files and extract data using a custom, readable AST. For a full list of available variables, block structures, and multiline extractions, see the [Skeletal Templates Syntax Guide](docs/templates.md).
+Skeletal Templates verify the contents of text files and extract data using a custom, readable AST. For a full list of available variables, block structures, and multiline extractions, see the [Skeletal Templates Syntax Guide](https://github.com/ghackenberg/skelantic/blob/main/docs/templates.md).
 
 Create `.skelantic/templates/issue.md`:
 
@@ -88,7 +88,7 @@ class IssueTemplate(BaseModel):
 
 Processors are written in pure Python and execute validation logic. Use the `@processor` decorator to bind them to specific files matching a glob pattern. 
 
-Skelantic automatically instantiates your generated Pydantic models and injects them, along with context and trace loggers, directly into your function. For a deep dive into the injected parameters, the different phases, and cross-file relational checks, see [Writing Processors & Understanding Context](docs/processors.md) and the [File System Nodes API](docs/nodes.md).
+Skelantic automatically instantiates your generated Pydantic models and injects them, along with context and trace loggers, directly into your function. For a deep dive into the injected parameters, the different phases, and cross-file relational checks, see [Writing Processors & Understanding Context](https://github.com/ghackenberg/skelantic/blob/main/docs/processors.md) and the [File System Nodes API](https://github.com/ghackenberg/skelantic/blob/main/docs/nodes.md).
 
 ```python
 from typing import List, Callable, cast
@@ -138,10 +138,10 @@ skelantic run -p "my_project.processors" -m "my_project.models"
 
 ## 🤝 Contributing
 
-If you want to contribute to the development of the Skelantic engine itself, please see our [CONTRIBUTING.md](CONTRIBUTING.md) guide.
+If you want to contribute to the development of the Skelantic engine itself, please see our [CONTRIBUTING.md](https://github.com/ghackenberg/skelantic/blob/main/CONTRIBUTING.md) guide.
 
 ## 📚 More Documentation
 
-* [Writing Processors & Understanding Context](docs/processors.md)
-* [File System Nodes API (FSNode)](docs/nodes.md)
-* [Skeletal Templates Syntax Guide](docs/templates.md)
+* [Writing Processors & Understanding Context](https://github.com/ghackenberg/skelantic/blob/main/docs/processors.md)
+* [File System Nodes API (FSNode)](https://github.com/ghackenberg/skelantic/blob/main/docs/nodes.md)
+* [Skeletal Templates Syntax Guide](https://github.com/ghackenberg/skelantic/blob/main/docs/templates.md)
