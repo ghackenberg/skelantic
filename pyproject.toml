@@ -1,14 +1,13 @@
 [build-system]
-requires = ["setuptools>=61.0", "setuptools_scm[toml]>=8.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs", "hatch-fancy-pypi-readme"]
+build-backend = "hatchling.build"
 
 [project]
 name = "skelantic"
-dynamic = ["version"]
+dynamic = ["version", "readme"]
 description = "A declarative repository governance and automation framework using skeletal templates and Pydantic."
-readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Dr. Georg Hackenberg", email = "georg.hackenberg@fh-ooe.at" }]
 dependencies = [
     "PyYAML>=6.0.2",
@@ -27,8 +26,19 @@ dev = [
 [project.scripts]
 skelantic = "skelantic.cli:main"
 
-[tool.setuptools_scm]
-# Can be left empty. It just needs to exist to activate the plugin.
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+# Replaces all relative links (that don't start with http://, https://, or #) with absolute GitHub URLs
+pattern = '\]\(((?!https?://|#)[^)]+)\)'
+replacement = '](https://github.com/ghackenberg/skelantic/blob/main/\1)'
 
 [tool.pyright]
 include = ['src/skelantic', 'tasks.py']
