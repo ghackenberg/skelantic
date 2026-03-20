@@ -143,6 +143,3 @@ def generate_models(output_dir: str) -> None:
                     f.write("\n")
                     
     print(f"✅ Generated {len(templates)} models in {output_dir}/")
-
-if __name__ == "__main__":
-    generate_models()

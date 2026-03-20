@@ -1,5 +1,4 @@
 import os
-import sys
 import inspect
 import importlib
 from collections import defaultdict
@@ -40,7 +39,7 @@ class LinterEngine:
             self._log(f"Loaded ROOT config from {new_config_path}")
         else:
             self.config = {}
-        self.compiled_patterns = [(get_regex(p), d, ".") for p, d in self.config.get('patterns', {}).items()]
+        self.compiled_patterns: List[Any] = []
 
     def _log(self, msg: str, level: str = "DEBUG") -> None:
         if self.verbose: print(f"{'🔍 DEBUG: ' if level == 'DEBUG' else '💡 INFO:  '}{msg}")
@@ -213,8 +212,6 @@ class LinterEngine:
                 current_config = current_config.copy()
                 current_config['files'] = {**current_config.get('files', {}), **(local_c.get('files') or {})}
                 current_config['directories'] = {**current_config.get('directories', {}), **(local_c.get('directories') or {})}
-            if local_c.get('patterns'):
-                for pat, data in local_c['patterns'].items(): active_patterns.append((get_regex(pat), data, config_dir))
             for pat, data in local_c.get('files', {}).items():
                 if "**" in pat: active_patterns.append((get_regex(pat), data, config_dir))
             

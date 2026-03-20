@@ -75,4 +75,45 @@ You can request any combination of the following parameters:
 * `node: FileNode` (or `DirectoryNode`): The file currently being inspected. Gives you access to `node.rel_path`, `node.parent_dir`, and `node.document.raw_content`. For details, see the [File System Nodes API](nodes.md).
 * `ctx: LinterContext`: The global shared memory.
 * `tracer: Callable[[str], None]`: A function you can call to write debug logs. If your processor returns an error, these traces will be saved to `.skelantic/traces/` to help the user debug.
-* **Path Variables**: If your `@processor(match="docs/{domain_name}/*.md")` uses wildcard variables, you can request them simply by adding `domain_name: str` to your function signature!
+
+### Injecting Path Variables from `config.yaml`
+
+One of the most powerful features of Skelantic is its ability to inject **Path Variables** directly into your processor functions. 
+
+If your `.skelantic/config.yaml` defines a path with variables (e.g., `{id:int}-{slug:words}.md`), the Skelantic engine automatically extracts these values during the directory traversal. For a full list of available variable types, see the [Configuration Guide > Path Variables](config.md#path-variables).
+
+To use them in your processor, simply add arguments to your function signature with the **exact same names** as the variables in your `config.yaml` (or the variables in your `@processor(match="...")` regex).
+
+**Example `config.yaml`:**
+```yaml
+directories:
+  "docs":
+    directories:
+      "teams":
+        files:
+          "{team_id:int}-{domain_name:words}.md":
+            description: "A team definition file"
+```
+
+**Example Processor:**
+```python
+from typing import List
+from skelantic.commons.decorators import processor
+from skelantic.commons.nodes import FileNode
+
+# The match parameter binds the processor, but the variables 
+# are actually extracted by the engine using the config.yaml definition!
+@processor(match="docs/teams/*.md", phase=2)
+def validate_team_domain(node: FileNode, team_id: str, domain_name: str) -> List[str]:
+    # team_id and domain_name are automatically injected!
+    # E.g., for "docs/teams/004-auth-services.md":
+    # team_id == "004"
+    # domain_name == "auth-services"
+    
+    if not domain_name.islower():
+        return [f"Domain name '{domain_name}' must be completely lowercase."]
+        
+    return []
+```
+
+**Note on Types:** Even if you defined `{team_id:int}` in your config, all path variables are currently injected as **strings** (`str`) into your Python functions. You must cast them to integers (`int(team_id)`) if you need to perform mathematical operations.

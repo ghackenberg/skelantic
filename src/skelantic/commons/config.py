@@ -27,32 +27,40 @@ class ConfigLoader:
         if "description" not in config_dict:
             self.add_results("ERROR", config_path, ["Fehlende 'description' auf Root-Ebene der Konfiguration."])
             
-        allowed_root = {"description", "files", "directories", "assertions", "patterns"}
+        allowed_root = {"description", "files", "directories"}
         for k, v in config_dict.items():
             if k not in allowed_root:
                 self.add_results("ERROR", config_path, [f"Ungültiger Key '{k}'."])
-            if k in ["files", "directories"] and isinstance(v, dict):
+            if k == "files" and isinstance(v, dict):
                 for sub_k, sub_v in cast(Dict[str, Any], v).items():
-                    self._validate_node_config(sub_v, config_path, sub_k)
+                    self._validate_node_config(sub_v, config_path, sub_k, is_directory=False)
+            if k == "directories" and isinstance(v, dict):
+                for sub_k, sub_v in cast(Dict[str, Any], v).items():
+                    self._validate_node_config(sub_v, config_path, sub_k, is_directory=True)
 
-    def _validate_node_config(self, config: Any, config_path: str, node_name: str) -> None:
+    def _validate_node_config(self, config: Any, config_path: str, node_name: str, is_directory: bool = False) -> None:
         if not isinstance(config, dict): return
 
         config_dict = cast(Dict[str, Any], config)
         if "description" not in config_dict:
             self.add_results("ERROR", config_path, [f"Fehlende 'description' für den Knoten '{node_name}'."])
 
-        allowed = {"description", "assertions", "template", "optional", "silent", "files", "directories", "authorize"}
+        allowed_common = {"description", "optional", "silent", "authorize"}
+        allowed_dir = allowed_common | {"files", "directories"}
+        allowed_file = allowed_common | {"template"}
+        allowed = allowed_dir if is_directory else allowed_file
+
         for k in config_dict.keys():
             if k not in allowed:
                 self.add_results("ERROR", config_path, [f"Ungültiger Key '{k}' im Knoten '{node_name}'."])
                 
-        if "files" in config_dict and isinstance(config_dict["files"], dict):
-            for sub_k, sub_v in cast(Dict[str, Any], config_dict["files"]).items():
-                self._validate_node_config(sub_v, config_path, f"{node_name}/{sub_k}")
-        if "directories" in config_dict and isinstance(config_dict["directories"], dict):
-            for sub_k, sub_v in cast(Dict[str, Any], config_dict["directories"]).items():
-                self._validate_node_config(sub_v, config_path, f"{node_name}/{sub_k}")
+        if is_directory:
+            if "files" in config_dict and isinstance(config_dict["files"], dict):
+                for sub_k, sub_v in cast(Dict[str, Any], config_dict["files"]).items():
+                    self._validate_node_config(sub_v, config_path, f"{node_name}/{sub_k}", is_directory=False)
+            if "directories" in config_dict and isinstance(config_dict["directories"], dict):
+                for sub_k, sub_v in cast(Dict[str, Any], config_dict["directories"]).items():
+                    self._validate_node_config(sub_v, config_path, f"{node_name}/{sub_k}", is_directory=True)
 
     def expand_deep_paths(self, config: Dict[str, Any]) -> Dict[str, Any]:
         for section in ["files", "directories"]:

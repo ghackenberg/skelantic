@@ -10,7 +10,7 @@ from skelantic.templates.generator import generate_models
 def main() -> None:
     if hasattr(sys.stdout, 'reconfigure'):
         try:
-            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stdout.reconfigure(encoding='utf-8') # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
         except Exception:
             pass
 

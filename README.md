@@ -30,7 +30,7 @@ pip install skelantic
 
 ### 2. Define the Repository Structure
 
-Skelantic operates on a "Strict-by-Default" (Default-Deny) philosophy. By defining cascading `.skelantic/config.yaml` files throughout your repository, you explicitly allow files and directories. Anything not explicitly permitted is flagged as an error.
+Skelantic operates on a "Strict-by-Default" (Default-Deny) philosophy. By defining cascading `.skelantic/config.yaml` files throughout your repository, you explicitly allow files and directories. Anything not explicitly permitted is flagged as an error. For a full list of configuration options, wildcards, and path variables, see the [Configuration Guide (`config.yaml`)](docs/config.md).
 
 Create a `.skelantic/config.yaml` at the root of your project:
 
@@ -146,6 +146,7 @@ If you want to contribute to the development of the Skelantic engine itself, ple
 
 ## 📚 More Documentation
 
+* [Configuration Guide (`config.yaml`)](docs/config.md)
 * [Writing Processors & Understanding Context](docs/processors.md)
 * [File System Nodes API (FSNode)](docs/nodes.md)
 * [Skeletal Templates Syntax Guide](docs/templates.md)
