@@ -63,4 +63,27 @@ If you are adding a new core feature:
 2. Write unit tests for your changes in the `tests/` folder.
 3. Run `invoke types` and `invoke test` before submitting a Pull Request.
 
+## 📦 Release Workflow
+
+Skelantic uses GitHub Actions to automate the release process to PyPI via Trusted Publishing. 
+
+To release a new version:
+
+1. **Update the version number:** Edit `version = "X.Y.Z"` in `pyproject.toml`.
+2. **Commit the version bump:** 
+   ```bash
+   git add pyproject.toml
+   git commit -m "chore: bump version to X.Y.Z"
+   git push origin main
+   ```
+3. **Create and push a Git tag:** The CI/CD pipeline triggers the deployment exclusively on tags that start with `v`.
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+4. **Automated Deployment:** Once the tag is pushed, GitHub Actions will:
+   - Run the full test suite and type checker.
+   - Build the source distribution and wheel.
+   - Publish the artifacts to PyPI securely using OpenID Connect (OIDC).
+
 Welcome aboard!
