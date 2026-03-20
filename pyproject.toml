@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools_scm[toml]>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "skelantic"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A declarative repository governance and automation framework using skeletal templates and Pydantic."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,9 @@ dev = [
 
 [project.scripts]
 skelantic = "skelantic.cli:main"
+
+[tool.setuptools_scm]
+# Can be left empty. It just needs to exist to activate the plugin.
 
 [tool.pyright]
 include = ['src/skelantic', 'tasks.py']

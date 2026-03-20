@@ -65,25 +65,18 @@ If you are adding a new core feature:
 
 ## 📦 Release Workflow
 
-Skelantic uses GitHub Actions to automate the release process to PyPI via Trusted Publishing. 
+Skelantic uses GitHub Actions to automate the release process to PyPI via Trusted Publishing. The project uses `setuptools_scm` for dynamic versioning, so you **do not** need to manually update a version number in a file. The Git tag is the single source of truth for the version.
 
 To release a new version:
 
-1. **Update the version number:** Edit `version = "X.Y.Z"` in `pyproject.toml`.
-2. **Commit the version bump:** 
-   ```bash
-   git add pyproject.toml
-   git commit -m "chore: bump version to X.Y.Z"
-   git push origin main
-   ```
-3. **Create and push a Git tag:** The CI/CD pipeline triggers the deployment exclusively on tags that start with `v`.
+1. **Create and push a Git tag:** The CI/CD pipeline triggers the deployment exclusively on tags that start with `v`.
    ```bash
    git tag vX.Y.Z
    git push origin vX.Y.Z
    ```
-4. **Automated Deployment:** Once the tag is pushed, GitHub Actions will:
+2. **Automated Deployment:** Once the tag is pushed, GitHub Actions will:
    - Run the full test suite and type checker.
-   - Build the source distribution and wheel.
+   - Build the source distribution and wheel, dynamically injecting the version from the Git tag.
    - Publish the artifacts to PyPI securely using OpenID Connect (OIDC).
 
 Welcome aboard!
