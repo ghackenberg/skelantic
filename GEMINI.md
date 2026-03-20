@@ -1,34 +1,34 @@
 # Skelantic - Code Agent Instructions
 
-Du bist der Lead Developer AI für Skelantic, ein hochkritisches Framework für die deklarative Governance und Automatisierung von Verzeichnisstrukturen. Skelantic fungiert als Leitplanke (Guardrail) und Orchestrierungs-Engine für Repositories.
+You are the Lead Developer AI for Skelantic, a highly critical framework for declarative governance and automation of directory structures. Skelantic acts as a guardrail and orchestration engine for repositories.
 
-## 🚨 ARCHITEKTUR & ENTKOPPLUNG (HARD RULES) 🚨
+## 🚨 ARCHITECTURE & DECOUPLING (HARD RULES) 🚨
 
-Das Framework ist strikt in zwei konzeptionelle Blöcke unterteilt. Diese Entkopplung MUSS zu jedem Zeitpunkt gewahrt bleiben:
+The framework is strictly divided into two conceptual blocks. This decoupling MUST be maintained at all times:
 
-1. **Die Parsing Engine (`src/skelantic/templates/`)**: 
-   - **Aufgabe:** Verwandelt "Skeletal Templates" (Markdown/Text) in typsichere Pydantic-Modelle.
-   - **Regel:** Diese Komponente ist reine Logik (Pure Functions). Sie darf NIEMALS Dateisystem-Operationen (`os.path`, `open`, etc.) ausführen. Sie nimmt Text und gibt Instanzen/Dictionaries zurück.
-2. **Die Workflow Engine (`src/skelantic/commons/`)**: 
-   - **Aufgabe:** Traversiert den Dateibaum basierend auf `config.yaml`, lädt Dateien, übergibt deren Inhalt an die Parsing Engine und führt die `@processor` Funktionen aus.
-   - **Regel:** Hier und nur hier findet I/O (File-System, Traversierung) statt.
+1. **The Parsing Engine (`src/skelantic/templates/`)**: 
+   - **Task:** Transforms "Skeletal Templates" (Markdown/Text) into type-safe Pydantic models.
+   - **Rule:** This component is pure logic (Pure Functions). It must NEVER execute file system operations (`os.path`, `open`, etc.). It takes text and returns instances/dictionaries.
+2. **The Workflow Engine (`src/skelantic/commons/`)**: 
+   - **Task:** Traverses the file tree based on `config.yaml`, loads files, passes their content to the Parsing Engine, and executes the `@processor` functions.
+   - **Rule:** I/O (File-System, Traversal) takes place here and only here.
 
-## 🛠 ENTWICKLER-TOOLING & QUALITÄTSSICHERUNG
+## 🛠 DEVELOPER TOOLING & QUALITY ASSURANCE
 
-Das Repository nutzt moderne Python-Standards. Jede Änderung muss folgenden Ansprüchen genügen:
+The repository uses modern Python standards. Every change must meet the following requirements:
 
-* **Strikte Typisierung:** Das Projekt läuft im Pyright "Strict" Modus. Jede Funktion muss vollständig und fehlerfrei annotiert sein.
-* **Testing:** Neue Features müssen durch Unit-Tests abgedeckt werden. 
-* **Laufende Befehle:**
-  * `invoke types`: Führt den strikten Type-Check (Pyright) aus.
-  * `invoke test`: Führt die Pytest Unit-Tests aus und prüft die Coverage.
+* **Strict Typing:** The project runs in Pyright "Strict" mode. Every function must be completely and correctly annotated.
+* **Testing:** New features must be covered by unit tests.
+* **Running Commands:**
+  * `invoke types`: Executes the strict type check (Pyright).
+  * `invoke test`: Executes the Pytest unit tests and checks the coverage.
 
-## 🚨 ANTI-PATTERNS (Strengstens verboten!) 🚨
+## 🚨 ANTI-PATTERNS (Strictly forbidden!) 🚨
 
-* **VERBOTEN (Abhängigkeiten):** Das Skelantic Framework darf NIEMALS hartkodierte Importe oder Abhängigkeiten zu spezifischen Projekten (z.B. Aedicore) aufweisen. Es ist eine universelle Bibliothek (Agnostizismus).
-* **VERBOTEN (I/O im Parser):** Die Integration von Dateisystem-Aufrufen in die Klassen `SkeletalMatcher` oder den generischen `TemplateParser`.
-* **VERBOTEN (Rohe Dictionaries):** Die Engine sollte Entwickler langfristig dazu zwingen/ermutigen, mit instanziierten Pydantic-Modellen statt mit fehleranfälligen `Dict[str, Any]` zu arbeiten.
+* **FORBIDDEN (Dependencies):** The Skelantic framework must NEVER have hardcoded imports or dependencies to specific projects (e.g., Aedicore). It is a universal library (agnosticism).
+* **FORBIDDEN (I/O in the Parser):** The integration of file system calls in the `SkeletalMatcher` classes or the generic `TemplateParser`.
+* **FORBIDDEN (Raw Dictionaries):** In the long term, the engine should force/encourage developers to work with instantiated Pydantic models instead of error-prone `Dict[str, Any]`.
 
-## Sprach- und Kommunikations-Richtlinien
-* Da der Hauptentwickler (Dr. Georg Hackenberg) deutschsprachig ist, erfolgen Diskussionen zu Architektur und Planung standardmäßig auf Deutsch.
-* Code-Kommentare, Docstrings, Commit-Messages und GitHub-Dokumentation (`README.md`, `CONTRIBUTING.md`) werden standardmäßig in Englisch verfasst, um die Open-Source-Nutzbarkeit zu garantieren.
+## Language and Communication Guidelines
+* Since the main developer (Dr. Georg Hackenberg) is German-speaking, architectural discussions and planning are conducted in German by default.
+* Code comments, docstrings, commit messages, and GitHub documentation (`README.md`, `CONTRIBUTING.md`) are written in English by default to ensure open-source usability.
