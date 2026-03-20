@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/icon/image.jpg" alt="Skelantic Icon" width="150" height="150" />
+</div>
+
 # Skelantic
 
 **A declarative file-tree processing and governance engine for Python.**

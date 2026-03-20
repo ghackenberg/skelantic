@@ -1,0 +1,9 @@
+A modern, minimalist app icon for a developer tool named 'Skelantic'. The tool is a repository governance and directory automation framework. The icon should abstractly combine the concept of a strong 'skeleton' or 'framework' with a 'file directory tree' or 'connected nodes'. 
+
+Style guidelines:
+- Clean geometric shapes and thick, balanced lines.
+- Professional dark mode color palette (e.g., deep dark blue/charcoal background with vibrant cyan, teal, or glowing orange accents).
+- Flat vector or subtle 3D style, highly legible at small sizes.
+- Symmetrical and well-centered.
+- NO text, pure iconography.
+- High-tech, modern developer tool aesthetic.

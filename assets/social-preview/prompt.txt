@@ -1,0 +1,12 @@
+A high-quality, abstract background image for a GitHub social preview (16:9 aspect ratio). The visual represents a developer tool named 'Skelantic', which is a declarative repository governance and directory automation framework. 
+
+Visual concept:
+Show a glowing, complex file directory tree that seamlessly transforms into a robust, structured scaffolding or "skeleton". 
+
+Style guidelines:
+- The environment should feel like a high-tech digital cyberspace or advanced control architecture.
+- Dark mode color scheme (dark charcoal or pure black background) with glowing neon accents in cyan, teal, and a touch of purple.
+- 3D isometric or sleek 2D vector art style.
+- Highly professional, clean, cyberpunk developer aesthetic.
+- IMPORTANT: Leave ample empty negative space on the left side or center for typography overlay (which will be added later).
+- NO text should be generated in the image.
