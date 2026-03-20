@@ -40,6 +40,11 @@ path = "README.md"
 pattern = '\]\(((?!https?://|#)[^)]+)\)'
 replacement = '](https://github.com/ghackenberg/skelantic/blob/main/\1)'
 
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+# Replaces relative image srcs with absolute raw GitHub URLs so they render on PyPI
+pattern = 'src="((?!https?://)[^"]+)"'
+replacement = 'src="https://raw.githubusercontent.com/ghackenberg/skelantic/main/\1"'
+
 [tool.pyright]
 include = ['src/skelantic', 'tasks.py']
 exclude = ['**/__pycache__', '**/.pytest_cache']
