@@ -69,7 +69,7 @@ Status: {{status:enum[OPEN,IN_PROGRESS,DONE]}}
 
 ### 4. Generate Pydantic Models
 
-Before writing your custom logic, use the Skelantic CLI to automatically generate strongly-typed Pydantic models from your Skeletal Templates:
+Before writing your custom logic, use the [Skelantic CLI](docs/cli.md) to automatically generate strongly-typed Pydantic models from your Skeletal Templates:
 
 ```bash
 skelantic generate -o "my_project/models"
@@ -126,7 +126,7 @@ def validate_issue_status(node: FileNode, ctx: LinterContext, tracer: Callable[[
 
 ### 6. Run the Engine
 
-Use the Skelantic CLI to execute the workflow engine against your repository. 
+Use the [Skelantic CLI](docs/cli.md) to execute the workflow engine against your repository. 
 
 ```bash
 # Run the engine to validate the repository
@@ -146,6 +146,7 @@ If you want to contribute to the development of the Skelantic engine itself, ple
 
 ## 📚 More Documentation
 
+* [Command Line Interface (CLI) Reference](docs/cli.md)
 * [Configuration Guide (`config.yaml`)](docs/config.md)
 * [Writing Processors & Understanding Context](docs/processors.md)
 * [File System Nodes API (FSNode)](docs/nodes.md)

@@ -44,3 +44,17 @@ replacement = '](https://github.com/ghackenberg/skelantic/blob/main/\1)'
 include = ['src/skelantic', 'tasks.py']
 exclude = ['**/__pycache__', '**/.pytest_cache']
 typeCheckingMode = 'strict'
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/docs",
+    "/README.md",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/skelantic"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"README.md" = "skelantic/_docs/README.md"
+"docs" = "skelantic/_docs/docs"
