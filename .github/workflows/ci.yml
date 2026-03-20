@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'v*' # Trigger auf Versions-Tags (z.B. v1.0.0)
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .[dev]
+        pip install invoke
+
+    - name: Run Type Checking (Pyright)
+      run: |
+        invoke types
+
+    - name: Run Unit Tests (Pytest)
+      run: |
+        invoke test
+
+  publish:
+    # Publish wird NUR ausgeführt, wenn es sich um einen neuen Versions-Tag handelt
+    # und der Test-Job erfolgreich war.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+
+    # Modern PyPI authentication using Trusted Publishing (OIDC)
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install invoke build twine
+
+    - name: Build distributions
+      run: |
+        invoke build
+
+    - name: Publish package to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
