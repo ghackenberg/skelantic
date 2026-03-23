@@ -8,12 +8,12 @@ Executes the Skelantic workflow engine against your repository. It parses config
 
 **Usage:**
 ```bash
-skelantic run -p <processors_package> -m <models_package> [options]
+skelantic run -p <processors_package> -t <types_module> [options]
 ```
 
 **Arguments:**
-* `-m`, `--models` **(Required)**: The Python package path where your generated Pydantic models are located (e.g., `my_project.models`).
-* `-p`, `--processors` (Optional): The Python package path containing your `@processor` functions (e.g., `my_project.processors`). If provided, Skelantic will dynamically import all modules within this package to register the processors.
+* `-t`, `--types` **(Required)**: The Python module path where your generated `skelantic_types.py` is located (e.g., `tools.skelantic_types`).
+* `-p`, `--processors` (Optional): The Python package path containing your `@processor` functions (e.g., `tools.processors`). If provided, Skelantic will dynamically import all modules within this package to register the processors.
 * `-d`, `--dir` (Optional): The base directory to lint. Defaults to the current working directory (`.`).
 * `-v`, `--verbose` (Optional): Enables verbose output, which is helpful for debugging why a specific file was or was not matched.
 
@@ -21,15 +21,15 @@ skelantic run -p <processors_package> -m <models_package> [options]
 
 ## `skelantic generate`
 
-Parses your `.skelantic/templates/*.md` files and automatically generates strongly-typed Pydantic models into the specified output directory. You should run this command whenever you change the structure of a Skeletal Template.
+Parses your `.skelantic/templates/*.md` files and your `.skelantic/config.yaml` to automatically generate a single, strongly-typed "File System ORM" (`RepoGraph`). You should run this command whenever you change the structure of a Skeletal Template or your `config.yaml`.
 
 **Usage:**
 ```bash
-skelantic generate -o <output_directory>
+skelantic generate -o <output_file>
 ```
 
 **Arguments:**
-* `-o`, `--output` **(Required)**: The directory where the generated `.py` files should be saved. This directory must exist or will be created.
+* `-o`, `--output` **(Required)**: The file path where the generated Python code should be saved (e.g., `tools/skelantic_types.py`). This file will contain the `RepoGraph` and all Pydantic models.
 
 ---
 

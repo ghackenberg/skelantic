@@ -42,12 +42,16 @@ The absolute, fully resolved file system path to the item.
 The relative path of the item from the root of the repository (the folder where `skelantic run` was executed). This is usually the path you want to use for logging and indexing.
 *Example:* `Path("docs/issues/issue-001.md")`
 
-### `node.parent_dir` (pathlib.Path)
-Returns the relative path to the parent directory of this node.
-*Example:* `Path("docs/issues")`
+### `node.parent_node` (Optional[DirectoryNode])
+Returns the strongly typed `DirectoryNode` (or its specific generated subclass) that contains this node. Useful for navigating "up" the repository tree.
+*Example:* `parent = node.parent_node`
+
+### `node.path_params` (BaseModel)
+If the configuration for this node included variables in the path (e.g., `{slug}.md`), this property holds a strictly typed Pydantic model containing those extracted variables. If no variables were defined, this property may not exist.
+*Example:* `slug = node.path_params.slug`
 
 ### `node.data` (Any)
-If this node is a file that matched a Skeletal Template, this property holds the parsed data dictionary (or Pydantic model) for this file. If it didn't match a template, this is `None`.
+If this node is a file that matched a Skeletal Template, this property holds the fully validated Pydantic model for this file (accessible via `node.data`). If it didn't match a template, this is the raw dictionary or `None`.
 
 ### `node.resolve(path_str: str) -> Optional[FSNode]`
 A powerful helper method to resolve relative paths starting from the current node and fetch their corresponding `FSNode` from the engine's memory.

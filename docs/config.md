@@ -60,6 +60,41 @@ When configuring a directory within the `directories` section, the following key
 * `optional` (Optional, `bool`): If set to `true`, the engine will only emit a **warning** (instead of an error) if the directory is missing.
 * `silent` (Optional, `bool`): If set to `true` (and `optional` is also `true`), the engine will emit **no warning** if the directory is missing.
 * `authorize` (Optional, `bool`): If `false`, allows matching against a pattern without granting implicit authorization for its existence.
+* `model` (Optional, `str`): Overrides the auto-generated PascalCase name for this node's class in the `RepoGraph`.
+* `property` (Optional, `str`): Overrides the auto-generated snake_case property name used to access this node from its parent in the `RepoGraph`.
+
+## Cascading Configurations (Sub-Directory Configs)
+
+For large repositories or monorepos, keeping everything in a single root `config.yaml` can become overwhelming. Skelantic supports **cascading configurations**. 
+
+You can place a `.skelantic/config.yaml` inside any subdirectory of your repository. 
+
+When the Skelantic engine (or the `generate` command) encounters a local config file during traversal, it **deep-merges** the local rules into the global configuration tree. 
+
+**Example:**
+If you have a root config:
+```yaml
+directories:
+  "docs":
+    description: "Documentation"
+```
+And a local config in `docs/.skelantic/config.yaml`:
+```yaml
+files:
+  "README.md":
+    description: "Docs Readme"
+```
+Skelantic will treat this exactly as if the root config contained:
+```yaml
+directories:
+  "docs":
+    description: "Documentation"
+    files:
+      "README.md":
+        description: "Docs Readme"
+```
+
+This allows individual teams or modules in a monorepo to manage their own local Linter rules and Skelantic configurations autonomously!
 
 ## Deep Path Expansion
 

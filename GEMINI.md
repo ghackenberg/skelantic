@@ -27,7 +27,7 @@ The repository uses modern Python standards. Every change must meet the followin
 
 * **FORBIDDEN (Dependencies):** The Skelantic framework must NEVER have hardcoded imports or dependencies to specific projects (e.g., Aedicore). It is a universal library (agnosticism).
 * **FORBIDDEN (I/O in the Parser):** The integration of file system calls in the `SkeletalMatcher` classes or the generic `TemplateParser`.
-* **FORBIDDEN (Raw Dictionaries):** In the long term, the engine should force/encourage developers to work with instantiated Pydantic models instead of error-prone `Dict[str, Any]`.
+* **FORBIDDEN (Untyped Data/State):** The engine natively generates a strongly-typed `RepoGraph` class mirroring the repository, allowing developers to type-hint their processors (`node: RepoGraph.Docs.ReadmeMd`). It also provides Dependency Injection for states. Avoid raw dictionaries (`Dict[str, Any]`) at all costs. Always prefer generating new types or relying on injected Pydantic BaseModels for global state.
 
 ## Language and Communication Guidelines
 * Since the main developer (Dr. Georg Hackenberg) is German-speaking, architectural discussions and planning are conducted in German by default.

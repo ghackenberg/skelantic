@@ -45,7 +45,7 @@ class ConfigLoader:
         if "description" not in config_dict:
             self.add_results("ERROR", config_path, [f"Fehlende 'description' für den Knoten '{node_name}'."])
 
-        allowed_common = {"description", "optional", "silent", "authorize"}
+        allowed_common = {"description", "optional", "silent", "authorize", "model", "property"}
         allowed_dir = allowed_common | {"files", "directories"}
         allowed_file = allowed_common | {"template"}
         allowed = allowed_dir if is_directory else allowed_file

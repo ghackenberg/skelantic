@@ -25,22 +25,63 @@ class FSNode:
         Gibt den referenzierten Knoten zurück, falls er existiert.
         """
         target_path = (self.parent_dir / path_str).resolve()
-        # Wir müssen den absoluten Pfad in den relativen Repo-Pfad zurückübersetzen,
-        # um ihn im Kontext (oder in der Registry) nachzuschlagen.
-        # Da Path.resolve() auf Windows C:\... erzeugt, ist es einfacher, 
-        # die sauberen relativen Pfade zu verwenden.
         
-        # Normiere den Pfad relativ zum Root-Verzeichnis (das wir hier als CWD annehmen)
         try:
             rel_target = target_path.relative_to(Path.cwd()).as_posix()
         except ValueError:
             return None
             
         return self._ctx.get_node(rel_target)
+        
+    @property
+    def parent_node(self) -> Optional['DirectoryNode']:
+        """Sucht den Knoten des übergeordneten Ordners im Graphen."""
+        parent_path = self.parent_dir.as_posix()
+        if parent_path == '.' and self.rel_path.as_posix() == '.':
+            return None
+        node = self._ctx.get_node(parent_path)
+        if isinstance(node, DirectoryNode):
+            return node
+        return None
 
 class DirectoryNode(FSNode):
     """Repräsentiert einen geprüften Ordner."""
-    pass
+    
+    def get_child_file(self, filename: str) -> Optional['FileNode']:
+        """Holt eine spezifische Datei aus diesem Ordner."""
+        node = self._ctx.get_node((self.rel_path / filename).as_posix())
+        if isinstance(node, FileNode):
+            return node
+        return None
+
+    def get_child_dir(self, dirname: str) -> Optional['DirectoryNode']:
+        """Holt einen spezifischen Unterordner aus diesem Ordner."""
+        node = self._ctx.get_node((self.rel_path / dirname).as_posix())
+        if isinstance(node, DirectoryNode):
+            return node
+        return None
+
+    def get_child_files_by_pattern(self, pattern: str) -> list['FileNode']:
+        """Findet alle Dateien in diesem Ordner, die einem Config-Pattern entsprechen."""
+        from .config import get_regex
+        regex = get_regex(pattern)
+        results: list['FileNode'] = []
+        for _, node in self._ctx.nodes_registry.items():
+            if isinstance(node, FileNode) and node.parent_dir == self.rel_path:
+                if regex.match(node.name):
+                    results.append(node)
+        return results
+
+    def get_child_dirs_by_pattern(self, pattern: str) -> list['DirectoryNode']:
+        """Findet alle Unterordner in diesem Ordner, die einem Config-Pattern entsprechen."""
+        from .config import get_regex
+        regex = get_regex(pattern)
+        results: list['DirectoryNode'] = []
+        for _, node in self._ctx.nodes_registry.items():
+            if isinstance(node, DirectoryNode) and node.parent_dir == self.rel_path:
+                if regex.match(node.name):
+                    results.append(node)
+        return results
 
 class FileNode(FSNode):
     """Repräsentiert eine geprüfte Datei und hält deren geparsten Inhalt."""
@@ -52,3 +93,10 @@ class FileNode(FSNode):
             self.document = MarkdownDocument(abs_path)
         else:
             self.document = Document(abs_path)
+
+class MarkdownNode(FileNode):
+    """Repräsentiert eine geprüfte Markdown-Datei."""
+    def __init__(self, abs_path: str, rel_path: str, ctx: LinterContext):
+        super().__init__(abs_path, rel_path, ctx)
+        self.document: MarkdownDocument # type: ignore[reportIncompatibleVariableOverride]
+

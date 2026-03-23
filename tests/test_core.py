@@ -173,9 +173,8 @@ def test_run_templates_match_success(tmp_path: Any) -> None:
     with patch('skelantic.commons.core.SkeletalMatcher') as MockMatcher:
         instance = MockMatcher.return_value
         instance.match.return_value = (True, [], {'data': 'Content'})
-        with patch('skelantic.templates.generator.get_module_info', return_value=(None, None)):
-            engine._run_templates(files_data)
-            assert engine.ctx.extracted_data['file.md'] == {'data': 'Content'}
+        engine._run_templates(files_data)
+        assert engine.ctx.extracted_data['file.md'] == {'data': 'Content'}
 
 def test_run_templates_match_failure(tmp_path: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
@@ -226,24 +225,24 @@ def test_execute_rule_success_and_crash() -> None:
     engine = LinterEngine(registry, models_module="test_models")
     node = MagicMock()
     node.document = MagicMock()
-    
-    def dummy_rule(node: Any, ctx: Any, doc: Any, rel_path: str, filename: str, tracer: Any) -> List[str]:
+
+    def dummy_rule(node: Any, tracer: Any) -> List[str]: 
         tracer("tracing step 1")
         return ["warning 1"]
-        
+
     f_data = {'rel_path': 'path/to/file.md', 'filename': 'file.md'}
-    
+
     # Test success returning a result (warning/error list)
     with patch('os.makedirs'):
         with patch('builtins.open', mock_open()):
-            engine._execute_rule(dummy_rule, "dummy_rule", node, f_data, {})
+            engine._execute_rule(dummy_rule, "dummy_rule", node, f_data)
     assert engine.total_errors == 2  # the results are added as errors by default in execute_rule if returned
     
     # Test crash
     def crash_rule() -> None:
         raise ValueError("boom")
         
-    engine._execute_rule(crash_rule, "crash_rule", node, f_data, {})
+    engine._execute_rule(crash_rule, "crash_rule", node, f_data)
     assert engine.total_errors == 3
 
 def test_run_global_phase() -> None:

@@ -43,3 +43,38 @@ def test_filenode_document(tmp_path: Any) -> None:
     
     txt_node = FileNode(str(txt_path), "test.txt", ctx)
     assert txt_node.document.__class__.__name__ == "Document"
+
+def test_fsnode_parent_node():
+    ctx = LinterContext()
+    parent_node = __import__('skelantic.commons.nodes', fromlist=['DirectoryNode']).DirectoryNode("C:/abs/path", "path", ctx)
+    ctx.register_node(parent_node)
+    
+    node = FSNode("C:/abs/path/file.txt", "path/file.txt", ctx)
+    assert node.parent_node is parent_node
+    
+    # Test root node has no parent
+    root_node = FSNode("C:/abs", ".", ctx)
+    assert root_node.parent_node is None
+
+def test_directorynode_children():
+    from skelantic.commons.nodes import DirectoryNode, FileNode
+    ctx = LinterContext()
+    dir_node = DirectoryNode("C:/abs/path", "path", ctx)
+    
+    child_file = FileNode("C:/abs/path/file.md", "path/file.md", ctx)
+    child_dir = DirectoryNode("C:/abs/path/sub", "path/sub", ctx)
+    ctx.register_node(dir_node)
+    ctx.register_node(child_file)
+    ctx.register_node(child_dir)
+    
+    assert dir_node.get_child_file("file.md") is child_file
+    assert dir_node.get_child_file("nonexistent.md") is None
+    
+    assert dir_node.get_child_dir("sub") is child_dir
+    assert dir_node.get_child_dir("nonexistent") is None
+    
+    assert child_file in dir_node.get_child_files_by_pattern("*.md")
+    assert not dir_node.get_child_files_by_pattern("*.txt")
+    
+    assert child_dir in dir_node.get_child_dirs_by_pattern("su*")
+

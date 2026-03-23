@@ -15,7 +15,7 @@ When the engine runs (`engine.run()`), it executes the following sequence:
 
 | Phase | Name | Description |
 | :--- | :--- | :--- |
-| **Pass 0** | **Template Matching** | Verifies documents against Skeletal Templates using the custom AST parser (`SkeletalMatcher`) and extracts raw data into dictionaries. It then automatically validates this data against generated Pydantic models. |
+| **Pass 0** | **Template Matching & Graph Generation** | Verifies documents against Skeletal Templates using the custom AST parser (`SkeletalMatcher`) and extracts raw data. The Engine then resolves the appropriate `RepoGraph` class, instantiates it, and automatically injects the validated Pydantic models into the node. |
 | **Pass 1** | **Indexing** | Executes Python processors (`phase=1`) designed to collect data for later global checks (e.g., collecting all Markdown file paths). |
 | **Pass 2** | **Validation** | Executes domain-specific Python processors (`phase=2`) on a per-file or per-directory basis to check constraints. |
 | **Pass 3** | **Global Pass** | Executes system-wide checks (`phase=3`) (e.g., finding orphaned documents that were never linked to). |

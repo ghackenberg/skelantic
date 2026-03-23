@@ -1,6 +1,5 @@
 import os
 import inspect
-import importlib
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, TypedDict, Pattern, cast
 from .documents import MarkdownDocument, Document
@@ -19,7 +18,7 @@ def tree() -> defaultdict[Any, Any]:
     return defaultdict(tree)
 
 class LinterEngine:
-    def __init__(self, registry: Registry, models_module: str, verbose: bool = False) -> None:
+    def __init__(self, registry: Registry, verbose: bool = False, types_module: Any = None, models_module: str = "") -> None:
         self.registry: Registry = registry
         self.verbose: bool = verbose
         self.models_module: str = models_module
@@ -29,6 +28,12 @@ class LinterEngine:
         self.total_warnings: int = 0
         self.document_cache: Dict[str, Document] = {}
         self.config_loader: ConfigLoader = ConfigLoader(self._add_results)
+        self._state_singletons: Dict[type, Any] = {}
+        
+        self.node_map: Dict[str, Any] = {}
+        if types_module and hasattr(types_module, "__SKELANTIC_NODE_MAP__"):
+            self.node_map = getattr(types_module, "__SKELANTIC_NODE_MAP__")
+
         
         # We remove hardcoded import of tools.skelantic.processors here to make skelantic independent.
         # It's up to the user of LinterEngine to import their processors so they register themselves via @processor.
@@ -68,23 +73,7 @@ class LinterEngine:
                         errs.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
                         self._add_results("ERROR", f_data['rel_path'], errs)
                     else:
-                        from skelantic.templates.generator import get_module_info, to_pascal
-                        rel_t_path = os.path.relpath(t_p, os.getcwd())
-                        mod_dir, t_name = get_module_info(rel_t_path)
-
-                        validated_data = data
-                        if mod_dir and t_name:
-                            try:
-                                mod_path = f"{self.models_module}.{mod_dir.replace('/', '.')}"
-                                module = importlib.import_module(mod_path)
-                                class_name = to_pascal(t_name) + "Template"
-                                model_class = getattr(module, class_name)
-                                data['rel_path'] = f_data['rel_path']
-                                validated_data = model_class(**data)
-                            except Exception as e:
-                                self._log(f"Failed to load/validate Pydantic model for {f_data['rel_path']}: {e}", level="WARNING")
-
-                        self.ctx.extracted_data[f_data['rel_path']] = validated_data
+                        self.ctx.extracted_data[f_data['rel_path']] = data
                 except Exception as e: self._add_results("ERROR", f_data['rel_path'], [f"Template Error: {e}"])
 
     def _get_or_create_doc(self, abs_filepath: str, rel_path: str, is_directory: bool = False) -> Document:
@@ -94,46 +83,82 @@ class LinterEngine:
         return doc
 
     def _run_phase(self, phase: int, files_data: List[Dict[str, Any]]) -> None:
-        from .nodes import FSNode
+        from .nodes import FSNode, FileNode, DirectoryNode
         for f_data in files_data:
-            node = FSNode(f_data['abs_path'], f_data['rel_path'], self.ctx)
-            if not f_data.get('is_directory', False):
-                node.__class__ = __import__('skelantic.commons.nodes', fromlist=['FileNode']).FileNode
-                node.document = self._get_or_create_doc(f_data['abs_path'], f_data['rel_path']) # type: ignore
+            rp = f_data['rel_path']
+            # Find matching class in node_map
+            NodeClass = None
+            if rp in self.node_map:
+                NodeClass = self.node_map[rp]
             else:
-                node.__class__ = __import__('skelantic.commons.nodes', fromlist=['DirectoryNode']).DirectoryNode
+                for pat, cls in self.node_map.items():
+                    if get_regex(pat).match(rp):
+                        NodeClass = cls
+                        break
+            
+            if NodeClass is None:
+                NodeClass = DirectoryNode if f_data.get('is_directory', False) else FileNode
 
-            node.data = self.ctx.extracted_data.get(f_data['rel_path'])
+            node = NodeClass(f_data['abs_path'], rp, self.ctx)
+            if not f_data.get('is_directory', False):
+                if not hasattr(node, 'document'):
+                    setattr(node, 'document', self._get_or_create_doc(f_data['abs_path'], rp)) # type: ignore[reportAttributeAccessIssue]
+                    
+            # Inject path params if class expects it
+            if hasattr(NodeClass, 'PathParams') and hasattr(NodeClass, '__annotations__') and 'path_params' in NodeClass.__annotations__:
+                try:
+                    ParamsClass = getattr(NodeClass, 'PathParams') # type: ignore[reportAttributeAccessIssue]
+                    setattr(node, 'path_params', ParamsClass(**f_data.get('kwargs', {}))) # type: ignore[reportAttributeAccessIssue]
+                except Exception as e:
+                    self._log(f"Failed to instantiate PathParams for {rp}: {e}")
+
+            node.data = self.ctx.extracted_data.get(rp)
             self.ctx.register_node(node)
-            # Execute rules from @processor(match="...", phase=X) bindings
+            
+            # Execute rules
             for binding in self.registry.bindings:
-
                 if binding.phase != phase:
                     continue
 
+                is_match = False
+                
+                # Check regex match
                 if binding.regex:
-                    match = binding.regex.match(f_data['rel_path'])
+                    match = binding.regex.match(rp)
                     if match:
-                        extracted_params = match.groupdict()
-                        # Combine kwargs from config.yaml parsing and regex matching
-                        combined_kwargs = {**f_data['kwargs'], **extracted_params}
-                        self._execute_rule(binding.func, binding.name, node, f_data, kwargs_extra=combined_kwargs)
+                        is_match = True
+                        
+                # Check type hint match
+                sig = inspect.signature(binding.func)
+                params = list(sig.parameters.values())
+                if params and issubclass(type(node), FSNode):
+                    first_param = params[0]
+                    if first_param.annotation != inspect.Parameter.empty and isinstance(node, first_param.annotation):
+                        is_match = True
+                        
+                if is_match:
+                    self._execute_rule(binding.func, binding.name, node, f_data)
 
-    def _execute_rule(self, func: Any, rule_name: str, node: Any, f_data: Dict[str, Any], kwargs_extra: Dict[str, Any]) -> None:
+    def _execute_rule(self, func: Any, rule_name: str, node: Any, f_data: Dict[str, Any]) -> None:
+        from pydantic import BaseModel
         sig = inspect.signature(func)
-        kwargs: Dict[str, Any] = {k: v for k, v in kwargs_extra.items() if k in sig.parameters}
+        kwargs: Dict[str, Any] = {}
 
         current_traces: List[str] = []
         def tracer(msg: str) -> None:
             current_traces.append(msg)
 
-        if 'node' in sig.parameters: kwargs['node'] = node
-        if 'ctx' in sig.parameters: kwargs['ctx'] = self.ctx
-        # Keep legacy params for backwards compatibility during migration
-        if 'doc' in sig.parameters and hasattr(node, 'document'): kwargs['doc'] = node.document  
-        if 'rel_path' in sig.parameters: kwargs['rel_path'] = os.path.dirname(f_data['rel_path'])
-        if 'filename' in sig.parameters: kwargs['filename'] = f_data['filename']
-        if 'tracer' in sig.parameters: kwargs['tracer'] = tracer                
+        for param_name, param in sig.parameters.items():
+            if hasattr(param.annotation, '__mro__') and issubclass(param.annotation, BaseModel):
+                state_cls = param.annotation
+                if state_cls not in self._state_singletons:
+                    self._state_singletons[state_cls] = state_cls()
+                kwargs[param_name] = self._state_singletons[state_cls]
+            elif param_name == 'node': kwargs['node'] = node
+            elif param_name == 'tracer': kwargs['tracer'] = tracer
+            else:
+                self._log(f"Warning: Argument '{param_name}' requested by processor '{rule_name}' cannot be injected. Only 'node', 'tracer', and Pydantic state models are supported.", level="WARNING")
+                
         try:
             res = func(**kwargs)
             if res:
@@ -147,6 +172,7 @@ class LinterEngine:
                     res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
                 self._add_results("ERROR", f_data['rel_path'], res)
         except Exception as e: self._add_results("ERROR", f_data['rel_path'], [f"Crash '{rule_name}': {e}"])
+
     def _run_global_phase(self, phase: int) -> None:
         for binding in self.registry.bindings:
             if binding.phase != phase:

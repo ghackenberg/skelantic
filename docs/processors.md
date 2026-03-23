@@ -1,6 +1,6 @@
-# The Skelantic Workflow & Context
+# The Skelantic Workflow & Processors
 
-Skelantic operates in four distinct passes (phases). Understanding these phases and how the `LinterContext` works is key to writing powerful, repository-wide validations.
+Skelantic operates in four distinct passes (phases). Understanding these phases, how the `RepoGraph` translates into strongly-typed nodes, and how Dependency Injection works is key to writing powerful, repository-wide validations.
 
 ## 1. The 4 Processing Phases
 
@@ -8,112 +8,91 @@ When the engine runs (`skelantic run`), it executes the following sequence:
 
 | Phase | Name | Description |
 | :--- | :--- | :--- |
-| **Pass 0** | **Template Matching** | Verifies documents against [Skeletal Templates](templates.md) using the custom AST parser (`SkeletalMatcher`) and extracts raw data into dictionaries. It then automatically validates this data against generated Pydantic models. All data is saved into `ctx.extracted_data`. |
-| **Pass 1** | **Indexing** | Executes Python processors (`phase=1`) designed to collect data for later global checks (e.g., collecting all Markdown file paths). |
+| **Pass 0** | **Template Matching & Graph Generation** | Verifies documents against [Skeletal Templates](templates.md). The engine automatically generates your `RepoGraph`, instantiates the correct specific node classes, and validates the extracted text against generated Pydantic models. |
+| **Pass 1** | **Indexing** | Executes Python processors (`phase=1`) designed to collect data for later global checks (e.g., collecting all Markdown file paths into a global state). |
 | **Pass 2** | **Validation** | Executes domain-specific Python processors (`phase=2`) on a per-file or per-directory basis to check constraints. This is where most of your business logic lives. |
 | **Pass 3** | **Global Pass** | Executes system-wide checks (`phase=3`) (e.g., finding orphaned documents that were never linked to). |
 
-## 2. The `LinterContext` (Shared Memory)
+## 2. Type-Based Matching
 
-The `LinterContext` is a shared state object injected into your processors. It holds the parsed data for every file in the repository, allowing you to perform relational checks (e.g. checking if an ID referenced in file A actually exists in file B).
+The core of Skelantic's processor system is **Type-Based Matching**. When you define your repository structure in `config.yaml`, Skelantic generates a strongly-typed `RepoGraph` class.
 
-It has two main attributes:
-* `ctx.extracted_data`: A dictionary where the key is the relative path of the file (e.g. `docs/issues/001.md`), and the value is the parsed data (a dictionary).
-* `ctx.store`: A generic dictionary where you can store custom indexing data during Phase 1 to use later in Phase 2 or Phase 3.
-
-## 3. Real-World Processor Example
-
-Here is a real-world example of how to write a processor that checks if a milestone ID referenced in an issue file actually exists as a file in the milestone folder.
+Instead of writing complex regex strings to target files, you simply **type-hint** your processor function with the specific class from your `RepoGraph`. The engine automatically knows *exactly* which files to pass to this processor.
 
 ```python
-from typing import List, Callable, Set, cast
+from typing import List
 from skelantic.commons.decorators import processor
-from skelantic.commons.context import LinterContext
-from skelantic.commons.nodes import FileNode
 
-# Import your generated models
-from my_project.models.issue import IssueTemplate
-from my_project.models.milestone import MilestoneTemplate
+# Import the generated RepoGraph
+from tools.skelantic_types import RepoGraph
 
-@processor(match="docs/issues/*.md", phase=2)
-def issue_milestone_valid(node: FileNode, ctx: LinterContext) -> List[str]:
-    # 1. Fetch the data for the CURRENT file being linted
-    full_path = node.rel_path.as_posix()
-    data = ctx.extracted_data.get(full_path, {})
-    if not data: return []
+# The engine executes this processor ONLY for files matching this specific class!
+# The `match=` parameter is completely optional.
+@processor(phase=2)
+def validate_issue_status(node: RepoGraph.Docs.Issues.SlugMd) -> List[str]:
+    # node.data is strongly-typed to the exact Pydantic model for this template!
+    model = node.data
     
-    # 2. Cast the raw dictionary into your typsafe model
-    model = IssueTemplate.model_validate(data)
-    
-    # 3. Check if the issue defines a milestone
-    milestone_id = model.milestone
-    if not milestone_id:
-        return []
-        
-    # 4. Use the LinterContext to iterate over the entire repository
-    #    and find all existing milestones.
-    valid_milestones: Set[str] = set()
-    for path, ex_data in ctx.extracted_data.items():
-        if "docs/milestones/" in path and path.endswith('.md'):
-            # Cast the remote file's data into its respective model
-            m_model = MilestoneTemplate.model_validate(ex_data)
-            if m_model.id:
-                valid_milestones.add(m_model.id)
-                
-    # 5. Assert referential integrity
-    if milestone_id not in valid_milestones:
-        return [f"Issue Milestone Invalid: Milestone '{milestone_id}' does not exist in the milestones/ folder."]
+    if model and model.status == "DONE" and not model.description:
+        return ["DONE issues must have a description."]
         
     return []
 ```
 
-## 4. Understanding the Injection Magic
+## 3. Dependency Injection (The Magic)
 
 The Skelantic `@processor` decorator uses Python's `inspect` module to dynamically inject exactly what your function needs based on its signature.
 
 You can request any combination of the following parameters:
-* `node: FileNode` (or `DirectoryNode`): The file currently being inspected. Gives you access to `node.rel_path`, `node.parent_dir`, and `node.document.raw_content`. For details, see the [File System Nodes API](nodes.md).
-* `ctx: LinterContext`: The global shared memory.
+* `node: <Your RepoGraph Class>`: The file or directory currently being inspected. Gives you typsafe access to `node.rel_path`, `node.parent_node`, `node.path_params`, and `node.data`.
 * `tracer: Callable[[str], None]`: A function you can call to write debug logs. If your processor returns an error, these traces will be saved to `.skelantic/traces/` to help the user debug.
 
-### Injecting Path Variables from `config.yaml`
+### Injecting Global State
 
-One of the most powerful features of Skelantic is its ability to inject **Path Variables** directly into your processor functions. 
+If you need to share data between processors (e.g., aggregating data in Phase 1 to validate it in Phase 3), you can define a custom Pydantic `BaseModel` for your state.
 
-If your `.skelantic/config.yaml` defines a path with variables (e.g., `{id:int}-{slug:words}.md`), the Skelantic engine automatically extracts these values during the directory traversal. For a full list of available variable types, see the [Configuration Guide > Path Variables](config.md#path-variables).
+Simply add your state class to the processor's signature. **Skelantic will automatically instantiate it as a Singleton and inject it!**
 
-To use them in your processor, simply add arguments to your function signature with the **exact same names** as the variables in your `config.yaml` (or the variables in your `@processor(match="...")` regex).
-
-**Example `config.yaml`:**
-```yaml
-directories:
-  "docs":
-    directories:
-      "teams":
-        files:
-          "{team_id:int}-{domain_name:words}.md":
-            description: "A team definition file"
-```
-
-**Example Processor:**
 ```python
-from typing import List
+from typing import Set, List
+from pydantic import BaseModel, Field
 from skelantic.commons.decorators import processor
-from skelantic.commons.nodes import FileNode
+from skelantic.commons.nodes import MarkdownNode
+from tools.skelantic_types import RepoGraph
 
-# The match parameter binds the processor, but the variables 
-# are actually extracted by the engine using the config.yaml definition!
-@processor(match="docs/teams/*.md", phase=2)
-def validate_team_domain(node: FileNode, team_id: str, domain_name: str) -> List[str]:
-    # team_id and domain_name are automatically injected!
-    # E.g., for "docs/teams/004-auth-services.md":
-    # team_id == "004"
-    # domain_name == "auth-services"
-    
-    if not domain_name.islower():
-        return [f"Domain name '{domain_name}' must be completely lowercase."]
-        
+# 1. Define your custom State
+class DocumentState(BaseModel):
+    all_markdown_files: Set[str] = Field(default_factory=set)
+    referenced_files: Set[str] = Field(default_factory=set)
+
+# 2. Inject it into Phase 1 to collect data
+#    (Using the base class MarkdownNode to target ALL markdown files)
+@processor(phase=1)
+def collect_links(node: MarkdownNode, state: DocumentState):
+    state.all_markdown_files.add(node.rel_path.as_posix())
+    for link in node.document.get_links():
+        state.referenced_files.add(link)
+
+# 3. Inject it into Phase 3 to validate global constraints
+@processor(match="root", phase=3)
+def check_orphans(state: DocumentState) -> List[str]:
+    orphans = state.all_markdown_files - state.referenced_files
+    if orphans:
+        return [f"Found orphaned documents: {orphans}"]
     return []
 ```
 
-**Note on Types:** Even if you defined `{team_id:int}` in your config, all path variables are currently injected as **strings** (`str`) into your Python functions. You must cast them to integers (`int(team_id)`) if you need to perform mathematical operations.
+### Path Variables (`path_params`)
+
+If your `.skelantic/config.yaml` defines a path with variables (e.g., `{team_id:int}-{slug:words}.md`), the Skelantic engine automatically extracts these values and makes them available on the node in a strictly typed manner!
+
+```python
+@processor(phase=2)
+def validate_team_file(node: RepoGraph.Docs.Teams.TeamFile):
+    # Typsafe access to variables extracted from the path!
+    team_id: int = node.path_params.team_id
+    domain: str = node.path_params.slug
+    
+    if team_id < 100:
+        return ["Team IDs must be >= 100."]
+```

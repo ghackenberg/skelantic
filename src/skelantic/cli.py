@@ -5,7 +5,6 @@ import importlib
 import pkgutil
 from skelantic.commons.core import LinterEngine
 from skelantic.commons.decorators import registry
-from skelantic.templates.generator import generate_models
 
 def main() -> None:
     if hasattr(sys.stdout, 'reconfigure'):
@@ -21,10 +20,11 @@ def main() -> None:
     run_parser.add_argument("-d", "--dir", default=".", help="The base directory to lint.")
     run_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
     run_parser.add_argument("-p", "--processors", default=None, help="The Python package containing the @processor functions (e.g. 'tools.skelantic.processors').")
-    run_parser.add_argument("-m", "--models", required=True, help="The Python package where Pydantic models are located.")
+    run_parser.add_argument("-t", "--types", required=True, help="The Python module containing the generated types (e.g. 'tools.skelantic.types').")
 
     gen_parser = subparsers.add_parser("generate", help="Generate Pydantic models from Skeletal Templates.")
-    gen_parser.add_argument("-o", "--output", required=True, help="Output directory for generated models.")
+    gen_parser.add_argument("-o", "--output", required=True, help="Output file path for generated types (e.g. 'tools/skelantic/types.py').")
+    gen_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output during generation.")
 
     docs_parser = subparsers.add_parser("docs", help="Print Skelantic documentation (useful for AI Agents).")
     docs_parser.add_argument("topic", nargs="?", default=None, help="The documentation topic to print (e.g. 'templates'). If omitted, prints a summary.")
@@ -46,14 +46,24 @@ def main() -> None:
                 print(f"Error importing processors module '{args.processors}': {e}")
                 sys.exit(1)
 
-        engine = LinterEngine(registry, verbose=args.verbose, models_module=args.models)
+        types_module = None
+        if args.types:
+            try:
+                types_module = importlib.import_module(args.types)
+            except ImportError as e:
+                print(f"Error importing types module '{args.types}': {e}")
+                sys.exit(1)
+
+        engine = LinterEngine(registry, verbose=args.verbose, types_module=types_module)
         engine.run(args.dir)
         failed = engine.print_report()
         if failed:
             sys.exit(1)
 
     elif args.command == "generate":
-        generate_models(output_dir=args.output)
+        from skelantic.commons.codegen import run_codegen
+        config_path = os.path.join(".", ".skelantic", "config.yaml")
+        run_codegen(config_path=config_path, output_path=args.output, verbose=args.verbose)
 
     elif args.command == "docs":
         import pathlib

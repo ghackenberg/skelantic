@@ -1,0 +1,21 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          release-type: python
+          # We don't need release-please to bump versions in pyproject.toml
+          # because Skelantic uses hatch-vcs (tags as single source of truth).
+          # release-please will just maintain CHANGELOG.md and create the Git tag.
