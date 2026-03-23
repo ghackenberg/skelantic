@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import importlib
+import importlib.metadata
 import pkgutil
 from skelantic.commons.core import LinterEngine
 from skelantic.commons.decorators import registry
@@ -25,6 +26,9 @@ def main() -> None:
     gen_parser = subparsers.add_parser("generate", help="Generate Pydantic models from Skeletal Templates.")
     gen_parser.add_argument("-o", "--output", required=True, help="Output file path for generated types (e.g. 'tools/skelantic/types.py').")
     gen_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output during generation.")
+
+    migrate_parser = subparsers.add_parser("migrate", help="Output AI-ready migration prompts for upgrading Skelantic.")
+    migrate_parser.add_argument("--from", dest="from_version", default=None, help="The version to migrate from (e.g., '0.1.0'). If omitted, reads from .skelantic/version.")
 
     docs_parser = subparsers.add_parser("docs", help="Print Skelantic documentation (useful for AI Agents).")
     docs_parser.add_argument("topic", nargs="?", default=None, help="The documentation topic to print (e.g. 'templates'). If omitted, prints a summary.")
@@ -64,6 +68,52 @@ def main() -> None:
         from skelantic.commons.codegen import run_codegen
         config_path = os.path.join(".", ".skelantic", "config.yaml")
         run_codegen(config_path=config_path, output_path=args.output, verbose=args.verbose)
+
+    elif args.command == "migrate":
+        import importlib.metadata
+        import pathlib
+        
+        try:
+            current_version = importlib.metadata.version('skelantic')
+        except importlib.metadata.PackageNotFoundError:
+            current_version = "unknown"
+            
+        from_version = args.from_version
+        
+        if not from_version:
+            version_file = pathlib.Path(".skelantic/version")
+            if version_file.exists():
+                from_version = version_file.read_text(encoding="utf-8").strip()
+            else:
+                from_version = "0.1.x"
+                print(f"Warning: Could not find .skelantic/version file. Assuming starting version is {from_version}.\n")
+                
+        cli_path = pathlib.Path(__file__).resolve()
+        pkg_root = cli_path.parent
+        migrations_dir = pkg_root / "migrations"
+        
+        if not migrations_dir.exists() or not migrations_dir.is_dir():
+            migrations_dir = cli_path.parent.parent.parent / "src" / "skelantic" / "migrations"
+            
+        if not migrations_dir.exists():
+            print("No migrations found in the Skelantic installation.")
+            sys.exit(0)
+            
+        migration_files = sorted(migrations_dir.glob("*.md"))
+        
+        print("<system_instruction>")
+        print(f"You are upgrading a Skelantic repository from v{from_version} to v{current_version}.")
+        print("Apply the following refactoring steps sequentially:")
+        print("</system_instruction>\n")
+        
+        for m_file in migration_files:
+            print(f'<migration file="{m_file.name}">')
+            print(m_file.read_text(encoding="utf-8"))
+            print("</migration>\n")
+            
+        print("<system_instruction>")
+        print("Once the refactoring is complete, run your skelantic generate command to update the types and the .skelantic/version file.")
+        print("</system_instruction>")
 
     elif args.command == "docs":
         import pathlib

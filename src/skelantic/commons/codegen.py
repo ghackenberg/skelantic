@@ -370,3 +370,13 @@ def run_codegen(config_path: str, output_path: str, verbose: bool = False) -> No
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(code)
     print(f"✅ Generated Skelantic Types in {output_path}")
+    
+    try:
+        import importlib.metadata
+        version = importlib.metadata.version('skelantic')
+        version_file = os.path.join(config_dir, "version")
+        with open(version_file, "w", encoding="utf-8") as vf:
+            vf.write(version)
+    except Exception as e:
+        if verbose:
+            print(f"💡 INFO: Could not write Skelantic version: {e}")
