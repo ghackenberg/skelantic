@@ -312,6 +312,8 @@ class CodeGenerator:
                 
             local_c = self.config_loader.load_config(local_config_path)
             dir_parts = rel_path.split('/')[:-2] # Remove .skelantic/config.yaml
+            local_base_dir = "/".join(dir_parts)
+            local_c = self.config_loader.resolve_paths(local_c, local_base_dir)
             
             curr = config
             for part in dir_parts:

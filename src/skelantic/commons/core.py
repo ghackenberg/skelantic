@@ -17,6 +17,16 @@ class MatcherDict(TypedDict):
 def tree() -> defaultdict[Any, Any]:
     return defaultdict(tree)
 
+def get_specificity_score(pattern: str) -> int:
+    score = len(pattern)
+    if '**' in pattern:
+        score -= 1000
+    elif '*' in pattern:
+        score -= 100
+    if '{' in pattern and '}' in pattern:
+        score -= 50
+    return score
+
 class LinterEngine:
     def __init__(self, registry: Registry, verbose: bool = False, types_module: Any = None, models_module: str = "") -> None:
         self.registry: Registry = registry
@@ -91,10 +101,13 @@ class LinterEngine:
             if rp in self.node_map:
                 NodeClass = self.node_map[rp]
             else:
+                best_score = -9999
                 for pat, cls in self.node_map.items():
                     if get_regex(pat).match(rp):
-                        NodeClass = cls
-                        break
+                        score = get_specificity_score(pat)
+                        if score > best_score:
+                            best_score = score
+                            NodeClass = cls
             
             if NodeClass is None:
                 NodeClass = DirectoryNode if f_data.get('is_directory', False) else FileNode

@@ -18,3 +18,11 @@ def test_core_run_phase_path_params():
 def test_core_log_info():
     engine = LinterEngine(registry, verbose=True)
     engine._log("test", "INFO")
+
+def test_get_specificity_score():
+    from skelantic.commons.core import get_specificity_score
+    
+    assert get_specificity_score("README.md") > get_specificity_score("{slug}.md")
+    assert get_specificity_score("{slug}.md") > get_specificity_score("*.md")
+    assert get_specificity_score("*.md") > get_specificity_score("**/*.md")
+    assert get_specificity_score("**/*.md") == len("**/*.md") - 1000
