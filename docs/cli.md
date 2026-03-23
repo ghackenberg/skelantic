@@ -33,6 +33,20 @@ skelantic generate -o <output_file>
 
 ---
 
+## `skelantic migrate`
+
+Outputs strictly formatted XML prompts designed to guide AI coding agents through upgrading a target repository to a newer version of Skelantic. The command determines the repository's current version (from `.skelantic/version`) and reads the required migration steps bundled within the `skelantic` package.
+
+**Usage:**
+```bash
+skelantic migrate [--from <version>]
+```
+
+**Arguments:**
+* `--from` (Optional): Manually specify the version to migrate from (e.g., `0.1.0`). If omitted, the command automatically reads the `.skelantic/version` file in the current directory.
+
+---
+
 ## `skelantic docs`
 
 A specialized command that prints the Skelantic framework documentation directly to your terminal. 

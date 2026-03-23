@@ -58,25 +58,28 @@ We have configured `tasks.py` to make development easy.
 
 ## 🏗️ Adding Features
 
-If you are adding a new core feature:
-1. Please ensure that the **I/O logic** (file reading/writing) remains strictly in the Workflow Engine (`commons/core.py`), and the Parsing Engine (`templates/`) remains pure logic.
+Skelantic enforces a strict **GitHub Flow** with branch protection:
+1. You cannot push directly to `main`. Create a feature branch (e.g., `feat/my-new-feature`).
 2. Write unit tests for your changes in the `tests/` folder.
-3. Run `invoke types` and `invoke test` before submitting a Pull Request.
+3. Ensure that the **I/O logic** remains strictly in the Workflow Engine (`commons/core.py`), and the Parsing Engine (`templates/`) remains pure logic.
+4. Run `invoke types` and `invoke test` (Coverage must be >= 90%).
+5. Submit a Pull Request.
 
-## 📦 Release Workflow
+**Important:** We enforce **Conventional Commits** via `pre-commit` and GitHub Actions. Your Pull Request title (which becomes the squash commit) must start with a valid type (e.g., `feat:`, `fix:`, `docs:`, `chore:`).
 
-Skelantic uses GitHub Actions to automate the release process to PyPI via Trusted Publishing. The project uses `hatch-vcs` for dynamic versioning, so you **do not** need to manually update a version number in a file. The Git tag is the single source of truth for the version.
+## 📦 Release Workflow (Automated)
+
+Skelantic uses **Google Release Please** for fully automated release management. You **do not** need to manually update version numbers, write changelogs, or push Git tags.
 
 To release a new version:
 
-1. **Create and push a Git tag:** The CI/CD pipeline triggers the deployment exclusively on tags that start with `v`.
-   ```bash
-   git tag vX.Y.Z
-   git push origin vX.Y.Z
-   ```
-2. **Automated Deployment:** Once the tag is pushed, GitHub Actions will:
-   - Run the full test suite and type checker.
-   - Build the source distribution and wheel, dynamically injecting the version from the Git tag.
-   - Publish the artifacts to PyPI securely using OpenID Connect (OIDC).
+1. **Merge your Feature PRs:** As you merge PRs into `main` using "Squash and Merge", ensure the PR title is a Conventional Commit. If your PR introduces a breaking change, use `feat!:` or add a `BREAKING CHANGE:` footer.
+2. **The Release PR:** A GitHub Action (Release Please) will automatically open or update a "Release Pull Request". This PR contains the auto-generated `CHANGELOG.md` and the calculated next version number.
+3. **Approve the Release:** When you are ready to publish the package to PyPI, simply **merge the Release PR**.
+4. **Automated Deployment:** Merging the Release PR automatically creates a Git tag (e.g., `v0.2.0`). This triggers our `ci.yml` pipeline to build the package (using `hatch-vcs` for dynamic versioning) and publish it to PyPI securely via OIDC.
+
+### Writing AI Migration Prompts
+If your PR introduces a breaking change to the processor API (e.g., changing how `node.data` is accessed), you MUST include a migration prompt for AI agents.
+Create a Markdown file in `docs/migrations/` (e.g., `002_v0.2.0_to_v0.3.0.md`) detailing the required refactoring steps. This file will be bundled into the CLI so agents can use `skelantic migrate`.
 
 Welcome aboard!
