@@ -42,7 +42,7 @@ def main() -> None:
             try:
                 proc_module = importlib.import_module(args.processors)
                 if hasattr(proc_module, '__path__'):
-                    for _, module_name, _ in pkgutil.iter_modules(proc_module.__path__):
+                    for _, module_name, _ in pkgutil.iter_modules(proc_module.__path__): # type: ignore
                         importlib.import_module(f"{args.processors}.{module_name}")
                 else:
                     print(f"Warning: The processors module '{args.processors}' does not seem to be a package. Imports might not be complete.")
@@ -70,7 +70,6 @@ def main() -> None:
         run_codegen(config_path=config_path, output_path=args.output, verbose=args.verbose)
 
     elif args.command == "migrate":
-        import importlib.metadata
         import pathlib
         
         try:
@@ -90,10 +89,13 @@ def main() -> None:
                 
         cli_path = pathlib.Path(__file__).resolve()
         pkg_root = cli_path.parent
-        migrations_dir = pkg_root / "migrations"
         
+        # 1. Try package data first (production/pip install)
+        migrations_dir = pkg_root / "_docs" / "docs" / "migrations"
+        
+        # 2. Fallback to repository root (local development)
         if not migrations_dir.exists() or not migrations_dir.is_dir():
-            migrations_dir = cli_path.parent.parent.parent / "src" / "skelantic" / "migrations"
+            migrations_dir = cli_path.parent.parent.parent / "docs" / "migrations"
             
         if not migrations_dir.exists():
             print("No migrations found in the Skelantic installation.")

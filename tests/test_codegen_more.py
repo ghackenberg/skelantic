@@ -74,8 +74,8 @@ def test_run_codegen(mock_file, mock_makedirs, mock_generate):
     
     mock_generate.assert_called_once_with("dummy_config.yaml", verbose=False)
     mock_makedirs.assert_called_once()
-    mock_file.assert_called_once()
-    mock_file().write.assert_called_once_with("fake_code")
+    assert mock_file.call_count == 2
+    mock_file().write.assert_any_call("fake_code")
 
 def test_codegen_generate_cascading_configs():
     cg = CodeGenerator(".")
