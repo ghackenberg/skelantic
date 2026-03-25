@@ -30,7 +30,7 @@ pip install skelantic
 
 ### 2. Define the Repository Structure
 
-Skelantic operates on a "Strict-by-Default" (Default-Deny) philosophy. By defining cascading `.skelantic/config.yaml` files throughout your repository, you explicitly allow files and directories. Anything not explicitly permitted is flagged as an error. For a full list of configuration options, wildcards, and path variables, see the [Configuration Guide (`config.yaml`)](docs/config.md).
+Skelantic operates on a "Strict-by-Default" (Default-Deny) philosophy. By defining cascading `.skelantic/config.yaml` files throughout your repository, you explicitly allow files and directories. Anything not explicitly permitted is flagged as an error. For a full list of configuration options and path variables, see the [Configuration Guide (`config.yaml`)](docs/config.md).
 
 Create a `.skelantic/config.yaml` at the root of your project:
 
@@ -46,7 +46,7 @@ directories:
       "issues":
         description: "Task tracking"
         files:
-          "{slug}.md":
+          "{slug:char(1,)}.md":
             description: "An issue file"
             template: ".skelantic/templates/issue.md"
 ```
@@ -145,7 +145,7 @@ skelantic run -p "tools.processors" -t "tools.skelantic_types"
 
 * **File System ORM:** Skelantic translates your `config.yaml` into a nested, strictly typed class hierarchy (`RepoGraph`). You can navigate the file system type-safely via properties like `node.parent_node` and generated child properties (e.g. `node.readme_md`).
 * **State Dependency Injection:** Need to aggregate data across files? Define a custom Pydantic `BaseModel` for your state and add it to your processor's signature. Skelantic automatically instantiates and injects the singleton!
-* **Strictness Flags:** In your `config.yaml`, use `optional: true` for warnings instead of errors, `silent: true` to suppress warnings, or `authorize: false` to apply patterns without implicitly authorizing existence.
+* **Strictness Flags:** In your `config.yaml`, use `optional: true` for warnings instead of errors, `silent: true` to suppress warnings, or `ignore: true` to completely exclude nodes like caches from the structural graph.
 
 ## 🤝 Contributing
 

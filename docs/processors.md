@@ -84,15 +84,15 @@ def check_orphans(state: DocumentState) -> List[str]:
 
 ### Path Variables (`path_params`)
 
-If your `.skelantic/config.yaml` defines a path with variables (e.g., `{team_id:int}-{slug:words}.md`), the Skelantic engine automatically extracts these values and makes them available on the node in a strictly typed manner!
+If your `.skelantic/config.yaml` defines a path with variables (e.g., `{team_id:digit}-{slug:char(1,)}.md`), the Skelantic engine automatically extracts these values and makes them available on the node in a strictly typed manner!
 
 ```python
 @processor(phase=2)
 def validate_team_file(node: RepoGraph.Docs.Teams.TeamFile):
     # Typsafe access to variables extracted from the path!
-    team_id: int = node.path_params.team_id
+    team_id: str = node.path_params.team_id
     domain: str = node.path_params.slug
     
-    if team_id < 100:
+    if int(team_id) < 100:
         return ["Team IDs must be >= 100."]
 ```

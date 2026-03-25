@@ -26,6 +26,8 @@ directories:
 
 Inside the `files` and `directories` dictionaries, the keys are path patterns (see "Path Patterns & Variables" below) and the values are the **Node Configurations**.
 
+**CRITICAL RULE:** Deep paths (e.g., `src/commons`) and Glob wildcards (`*`, `**`) are **strictly forbidden** in node keys to guarantee type safety. You must nest your YAML or use Cascading Configs to represent deep structures.
+
 ```yaml
 directories:
   "docs":
@@ -44,24 +46,43 @@ directories:
 
 When configuring a file within the `files` section, the following keys are allowed:
 
-* `description` **(Required)**: A short description of the matched file.
+* `description` **(Required unless ignored)**: A short description of the matched file.
 * `template` (Optional): The path to a Skeletal Template file (`.md` or `.txt`) used to parse and validate the file's content.
 * `optional` (Optional, `bool`): If set to `true`, the engine will only emit a **warning** (instead of an error) if the file is missing.
 * `silent` (Optional, `bool`): If set to `true` (and `optional` is also `true`), the engine will emit **no warning** if the file is missing.
-* `authorize` (Optional, `bool`): If `false`, allows matching against a pattern without granting implicit authorization for its existence.
+* `ignore` (Optional, `bool`): If set to `true`, the file is completely ignored by the engine (useful for noise like `.pdf` or `~temp` files). If this is true, no other keys are allowed!
 
 ## Directory Configuration
 
 When configuring a directory within the `directories` section, the following keys are allowed:
 
-* `description` **(Required)**: A short description of the matched directory.
+* `description` **(Required unless ignored)**: A short description of the matched directory.
 * `files` (Optional): Nested dictionary of file patterns inside this directory.
 * `directories` (Optional): Nested dictionary of directory patterns inside this directory.
 * `optional` (Optional, `bool`): If set to `true`, the engine will only emit a **warning** (instead of an error) if the directory is missing.
 * `silent` (Optional, `bool`): If set to `true` (and `optional` is also `true`), the engine will emit **no warning** if the directory is missing.
-* `authorize` (Optional, `bool`): If `false`, allows matching against a pattern without granting implicit authorization for its existence.
+* `ignore` (Optional, `bool`): If set to `true`, the directory is completely ignored by the engine (useful for `node_modules` or `__pycache__`). If this is true, no other keys are allowed!
 * `model` (Optional, `str`): Overrides the auto-generated PascalCase name for this node's class in the `RepoGraph`.
 * `property` (Optional, `str`): Overrides the auto-generated snake_case property name used to access this node from its parent in the `RepoGraph`.
+
+## Ignoring Files & Directories (The Noise Plane)
+
+Skelantic is a "Strict-by-Default" system. If your repository contains cache files, build folders, or other "noise", you must tell Skelantic to ignore them, otherwise they will be flagged as an error (`Unerlaubte Datei`).
+
+To ignore items, you define them just like regular files or directories, but set `ignore: true`.
+
+**Example:**
+```yaml
+directories:
+  "node_modules":
+    ignore: true
+files:
+  "{any_name}.pdf":
+    ignore: true
+  "{temp_file}.tmp":
+    ignore: true
+```
+*Note: Because wildcards are banned, you must use standard variables like `{any_name}` to catch files you want to ignore.*
 
 ## Cascading Configurations (Sub-Directory Configs)
 
@@ -96,26 +117,9 @@ directories:
 
 This allows individual teams or modules in a monorepo to manage their own local Linter rules and Skelantic configurations autonomously!
 
-## Deep Path Expansion
-
-Skelantic supports deep paths directly in the keys of `files` and `directories`. You don't need to deeply nest your YAML if you only want to define a specific deep path.
-
-```yaml
-directories:
-  "src/skelantic/commons":
-    description: "The workflow engine directory"
-```
-Behind the scenes, Skelantic automatically expands `"src/skelantic/commons"` into the corresponding nested directory tree, making the `config.yaml` much more concise.
-
 ## Path Patterns & Variables
 
-Skelantic features a powerful pattern matching engine for file and directory names.
-
-### Wildcards
-
-* `*`: Matches any sequence of characters within a single directory level (excluding `/`).
-* `**`: Recursive glob. Matches any character including directory boundaries (`.*`).
-* `**/`: When placed at the **start** of a pattern (e.g., `**/*.md`), it matches the subsequent pattern recursively in the current directory or any subdirectory.
+Skelantic features a powerful pattern matching engine for file and directory names. **Glob wildcards (`*`, `**`) are not allowed.**
 
 ### Path Variables
 
@@ -123,41 +127,23 @@ You can extract dynamic parts of paths into variables that are later passed into
 
 Path variables use the syntax `{variable_name:type(arguments)}`. 
 
-#### 1. Default (No type)
+#### 1. Digit (`digit`)
 
-If no type is specified, the parser assumes a single lowercase alphanumeric word (`[a-z][a-z0-9]*`).
-* **Restriction:** The word must start with a letter.
-* **Syntax:** `{variable_name}`
-
-**Examples:**
-* `"{slug}.md"` matches `feature.md` and extracts `slug="feature"`.
-* `"{slug}.md"` matches `bug123.md` and extracts `slug="bug123"`.
-* `"{slug}.md"` does **not** match `123bug.md` (does not start with a letter).
-* `"{slug}.md"` does **not** match `new-feature.md` (contains a hyphen).
-
-#### 2. Integer (`int`)
-
-Matches a sequence of digits (`\d+`). You can enforce exact lengths or variable length ranges using arguments.
-* **Syntax:** `{variable_name:int}` or `{variable_name:int(length)}` or `{variable_name:int(min,max)}`
+Matches a sequence of digits (`\d`). You can enforce exact lengths or variable length ranges using arguments. If no argument is provided, exactly ONE digit is matched.
+* **Syntax:** `{variable_name:digit}` or `{variable_name:digit(length)}` or `{variable_name:digit(min,max)}`
 
 **Examples:**
-* `"{id:int}.md"` matches `42.md` and extracts `id="42"`.
-* `"{id:int(4)}.md"` matches `0042.md` and extracts `id="0042"`.
-* `"{id:int(4)}.md"` does **not** match `42.md` (too short).
-* `"{id:int(1,4)}.md"` matches `42.md` and `0042.md`.
+* `"{id:digit(1,)}"` matches `42.md` and extracts `id="42"`.
+* `"{id:digit(4)}"` matches `0042.md` and extracts `id="0042"`.
+* `"{id:digit(4)}"` does **not** match `42.md` (too short).
+* `"{id:digit}"` matches `4.md` but does **not** match `42.md` (too long).
 
-#### 3. Words (`words`)
+#### 2. Char (`char`)
 
-Matches one or more hyphen-separated words (kebab-case). Each individual word must start with a letter.
-* **Syntax:** `{variable_name:words}` or `{variable_name:words(length)}` or `{variable_name:words(min,max)}`
+Matches alphanumeric characters (`[a-zA-Z0-9]`). You can enforce exact lengths or variable length ranges using arguments. If no argument is provided, exactly ONE character is matched.
+* **Syntax:** `{variable_name:char}` or `{variable_name:char(length)}` or `{variable_name:char(min,max)}`
 
 **Examples:**
-* `"{title:words}.md"` matches `feature.md`.
-* `"{title:words(3)}.md"` matches `new-feature-design.md` and extracts `title="new-feature-design"`.
-* `"{title:words(1,3)}.md"` matches `design.md`, `feature-design.md`, and `new-feature-design.md`.
-* `"{title:words(1,3)}.md"` does **not** match `1st-feature.md` (words must start with a letter).
-
-#### 4. Fallback Behavior
-
-Any unknown or misspelled type declaration falls back to the **Default** type (a single word) silently.
-* **Example:** `"{slug:custom}.md"` behaves exactly like `"{slug}.md"`.
+* `"{title:char(1,)}.md"` matches `feature.md`.
+* `"{initial:char}.md"` matches `f.md` but does **not** match `feature.md`.
+* `"{title:char(3)}.md"` matches `new.md` and extracts `title="new"`.

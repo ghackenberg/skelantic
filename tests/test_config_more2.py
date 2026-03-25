@@ -1,38 +1,42 @@
-from skelantic.commons.config import ConfigLoader
-from collections import defaultdict
+import pytest
 import yaml
+from skelantic.commons.config import ConfigLoader, get_regex
 
-def test_config_loader_invalid_node(tmp_path):
-    loader = ConfigLoader(lambda sev, p, res: None)
+def test_config_path_variables_validation(tmp_path):
+    errors = []
+    def cb(sev, p, res):
+        errors.extend(res)
+    loader = ConfigLoader(cb)
     
-    # Missing description
-    bad_conf = tmp_path / "bad.yaml"
-    bad_conf.write_text(yaml.dump({
+    bad_vars = tmp_path / "bad_vars.yaml"
+    bad_vars.write_text(yaml.dump({
+        "description": "test",
         "files": {
-            "test.md": {}
+            "{my_var}.md": {"description": "no type"},
+            "{my_var:unknown}.md": {"description": "unknown type"}
         }
     }))
-    loader.load_config(str(bad_conf))
+    
+    loader.load_config(str(bad_vars))
+    assert any("hat keinen expliziten Datentyp" in e for e in errors)
+    assert any("Unbekannter Datentyp 'unknown'" in e for e in errors)
 
-    # Unknown key
-    bad_conf2 = tmp_path / "bad2.yaml"
-    bad_conf2.write_text(yaml.dump({
-        "files": {
-            "test.md": {"description": "desc", "unknown": "value"}
-        }
-    }))
-    loader.load_config(str(bad_conf2))
+def test_get_regex_lengths():
+    # Test strict char and digit length parsing
+    regex = get_regex("{id:digit}.md")
+    assert regex.match("5.md")
+    assert regex.match("55.md") is None
+    
+    regex2 = get_regex("{id:digit(2)}.md")
+    assert regex2.match("42.md")
+    assert regex2.match("4.md") is None
+    
+    regex3 = get_regex("{name:char(1,3)}.md")
+    assert regex3.match("a.md")
+    assert regex3.match("abc.md")
+    assert regex3.match("abcd.md") is None
 
-    # Not a dict
-    bad_conf3 = tmp_path / "bad3.yaml"
-    bad_conf3.write_text(yaml.dump({
-        "files": "not_a_dict"
-    }))
-    loader.load_config(str(bad_conf3))
-
-    # Directories not a dict
-    bad_conf4 = tmp_path / "bad4.yaml"
-    bad_conf4.write_text(yaml.dump({
-        "directories": "not_a_dict"
-    }))
-    loader.load_config(str(bad_conf4))
+    regex4 = get_regex("{name:char(2,)}.md")
+    assert regex4.match("ab.md")
+    assert regex4.match("abc.md")
+    assert regex4.match("a.md") is None

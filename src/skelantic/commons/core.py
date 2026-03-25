@@ -32,6 +32,7 @@ class LinterEngine:
         self.registry: Registry = registry
         self.verbose: bool = verbose
         self.models_module: str = models_module
+        self.types_module: Any = types_module
         self.ctx: LinterContext = LinterContext()
         self.results_tree: defaultdict[Any, Any] = tree()
         self.total_errors: int = 0
@@ -43,10 +44,6 @@ class LinterEngine:
         self.node_map: Dict[str, Any] = {}
         if types_module and hasattr(types_module, "__SKELANTIC_NODE_MAP__"):
             self.node_map = getattr(types_module, "__SKELANTIC_NODE_MAP__")
-
-        
-        # We remove hardcoded import of tools.skelantic.processors here to make skelantic independent.
-        # It's up to the user of LinterEngine to import their processors so they register themselves via @processor.
         
         new_config_path = os.path.join(".", ".skelantic", "config.yaml")
         if os.path.exists(new_config_path):
@@ -54,14 +51,13 @@ class LinterEngine:
             self._log(f"Loaded ROOT config from {new_config_path}")
         else:
             self.config = {}
-        self.compiled_patterns: List[Any] = []
 
     def _log(self, msg: str, level: str = "DEBUG") -> None:
         if self.verbose: print(f"{'🔍 DEBUG: ' if level == 'DEBUG' else '💡 INFO:  '}{msg}")
 
     def run(self, base_dir: str = ".") -> None:
         all_files: List[Dict[str, Any]] = []
-        self._walk_and_validate(base_dir, self.config, all_files, rel_path=".", active_patterns=self.compiled_patterns)
+        self._walk_and_validate(base_dir, self.config, all_files, rel_path=".")
         self._run_templates(all_files); self._run_phase(1, all_files); self._run_phase(2, all_files); self._run_global_phase(3)
 
     def _run_templates(self, files_data: List[Dict[str, Any]]) -> None:
@@ -125,7 +121,26 @@ class LinterEngine:
                 except Exception as e:
                     self._log(f"Failed to instantiate PathParams for {rp}: {e}")
 
-            node.data = self.ctx.extracted_data.get(rp)
+            raw_data = self.ctx.extracted_data.get(rp)
+            if raw_data is not None and hasattr(NodeClass, '__annotations__') and 'data' in NodeClass.__annotations__:
+                model_cls_name = NodeClass.__annotations__['data']
+                if model_cls_name != 'Any' and isinstance(raw_data, dict):
+                    try:
+                        if isinstance(model_cls_name, str) and self.types_module:
+                            model_cls = eval(model_cls_name, dict(cast(Dict[str, Any], vars(self.types_module))))
+                        else:
+                            model_cls = model_cls_name
+                            
+                        raw_data['rel_path'] = rp
+                        model_constructor = cast(Any, model_cls)
+                        node.data = model_constructor(**raw_data)
+                    except Exception as e:
+                        self._log(f"Failed to instantiate Pydantic model for {rp}: {e}", level="WARNING")
+                        node.data = raw_data
+                else:
+                    node.data = raw_data
+            else:
+                node.data = raw_data
             self.ctx.register_node(node)
             
             # Execute rules
@@ -232,14 +247,13 @@ class LinterEngine:
         if self.total_errors > 0: print(f"🛑 FAILED: {self.total_errors} Errors, {self.total_warnings} Warnings."); return True
         print(f"✅ PASSED: 0 Errors, {self.total_warnings} Warnings." if self.total_warnings else "✨ PERFECT REPOSITORY!"); return False
 
-    def _walk_and_validate(self, current_dir: str, current_config: Dict[str, Any], all_files_out: List[Dict[str, Any]], rel_path: str = ".", active_patterns: Optional[List[Any]] = None, inherited_kwargs: Optional[Dict[str, Any]] = None) -> None:
+    def _walk_and_validate(self, current_dir: str, current_config: Dict[str, Any], all_files_out: List[Dict[str, Any]], rel_path: str = ".", ignore_patterns: Optional[List[Pattern[str]]] = None, inherited_kwargs: Optional[Dict[str, Any]] = None) -> None:
         inherited_kwargs = inherited_kwargs or {}
-        active_patterns = list(active_patterns) if active_patterns else []
+        ignore_patterns = list(ignore_patterns) if ignore_patterns else []
         try: entries = os.listdir(current_dir)
         except PermissionError: return
-        ignore = {".git", "node_modules", "venv", "__pycache__", ".skelantic", ".pytest_cache", ".mypy_cache", "linter.yaml", ".coverage"}
+        hard_ignore = {".git", "node_modules", "venv", "__pycache__", ".skelantic", ".pytest_cache", ".mypy_cache", "linter.yaml", ".coverage"}
         config_dir = rel_path
-        entries = [e for e in entries if e not in ignore and not e.endswith('.pyc')]
         
         # New Config Loading
         lcp_new = os.path.join(current_dir, ".skelantic", "config.yaml")
@@ -251,43 +265,56 @@ class LinterEngine:
                 current_config = current_config.copy()
                 current_config['files'] = {**current_config.get('files', {}), **(local_c.get('files') or {})}
                 current_config['directories'] = {**current_config.get('directories', {}), **(local_c.get('directories') or {})}
-            for pat, data in local_c.get('files', {}).items():
-                if "**" in pat: active_patterns.append((get_regex(pat), data, config_dir))
+            
+            for ig_pat in local_c.get('ignore', []):
+                ignore_patterns.append(get_regex(ig_pat))
+
+        filtered_entries: List[str] = []
+        for e in entries:
+            if e in hard_ignore or e.endswith('.pyc'):
+                continue
+            e_rp = e if rel_path == "." else f"{rel_path}/{e}"
+            if any(p.match(e_rp) or p.match(e) for p in ignore_patterns):
+                continue
+            filtered_entries.append(e)
             
         d_m: List[MatcherDict] = [{'regex': get_regex(p), 'pattern': p, 'config': cast(Dict[str, Any], v) or {}, 'matched': False} for p, v in current_config.get('directories', {}).items()]
         f_m: List[MatcherDict] = [{'regex': get_regex(p), 'pattern': p, 'config': cast(Dict[str, Any], v) or {}, 'matched': False} for p, v in current_config.get('files', {}).items()]
         
-        for entry in sorted(entries):
+        for entry in sorted(filtered_entries):
             full_p, entry_rp = os.path.join(current_dir, entry), (entry if rel_path == "." else f"{rel_path}/{entry}")
             is_d = os.path.isdir(full_p)
             matched_n: Optional[Dict[str, Any]] = None
             extracted_k: Dict[str, str] = {}
             m_list = d_m if is_d else f_m
-            is_auth = False
+            best_score = -9999
             
             for m in m_list:
                 match = m['regex'].match(entry)
                 if match:
-                    matched_n, extracted_k, m['matched'] = m['config'], match.groupdict(), True
-                    if matched_n.get('authorize', True): is_auth = True
-                    break
-            if not is_auth:
-                for regex, data, _ in active_patterns:
-                    if regex.match(entry_rp):
-                        if not matched_n: matched_n = data or {}
-                        if data.get('authorize', True): is_auth = True; break
+                    m['matched'] = True
+                    score = get_specificity_score(m['pattern'])
+                    if score > best_score:
+                        best_score = score
+                        matched_n = m['config']
+                        extracted_k = match.groupdict()
+                        
             if matched_n is None:
                 self._add_results("ERROR", entry_rp, [f"Unerlaubte(r) {'Ordner' if is_d else 'Datei'}!"])
                 continue
-            if not is_auth:
-                self._add_results("ERROR", entry_rp, [f"Unerlaubte(r) {'Ordner' if is_d else 'Datei'}!"])
+                
+            if matched_n.get('ignore'):
+                continue
+                
             curr_k = {**inherited_kwargs, **extracted_k}
-            if is_d: self._walk_and_validate(full_p, matched_n, all_files_out, entry_rp, active_patterns, curr_k)
+            if is_d:
+                all_files_out.append({'abs_path': full_p, 'rel_path': entry_rp, 'filename': entry, 'is_directory': True, 'kwargs': curr_k, 'template': matched_n.get('template'), 'base_dir': config_dir})
+                self._walk_and_validate(full_p, matched_n, all_files_out, entry_rp, ignore_patterns, curr_k)
             else:
                 all_files_out.append({'abs_path': full_p, 'rel_path': entry_rp, 'filename': entry, 'is_directory': False, 'kwargs': curr_k, 'template': matched_n.get('template'), 'base_dir': config_dir})
                 
         for m in d_m + f_m:
-            if not m['matched'] and "**" not in m['pattern']:
+            if not m['matched']:
                 is_opt = m['config'].get('optional', False)
-                if not is_opt: self._add_results("ERROR", rel_path, [f"Fehlendes Element: '{m['pattern']}'"])
+                if not is_opt: self._add_results("ERROR", rel_path, [f"Fehlendes Element: '{m['pattern']}': Datei/Ordner existiert nicht."])
                 elif not m['config'].get('silent', False): self._add_results("WARNING", rel_path, [f"Kein Match für '{m['pattern']}'"])

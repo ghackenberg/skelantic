@@ -7,25 +7,7 @@ from skelantic.commons.config import ConfigLoader
 from skelantic.commons.decorators import registry
 
 from typing import Any, List
-def test_deep_path_expansion() -> None:
-    # Callback dummy for add_results
-    def dummy_cb(severity: str, path: str, results: List[str]) -> None: pass
-    loader = ConfigLoader(dummy_cb)
-    
-    config: Any = {
-        "directories": {
-            "a/b/c": {"files": {"d.md": {}}}
-        }
-    }
-    expanded = loader.expand_deep_paths(config)
-    
-    assert "a" in expanded["directories"]
-    a_node = expanded["directories"]["a"]
-    assert "b" in a_node["directories"]
-    b_node = a_node["directories"]["b"]
-    assert "c" in b_node["directories"]
-    c_node = b_node["directories"]["c"]
-    assert "d.md" in c_node["files"]
+
 
 def test_strict_by_default(tmp_path: Any) -> None:
     linter_yaml = tmp_path / "linter.yaml"
@@ -44,7 +26,7 @@ def test_strict_by_default(tmp_path: Any) -> None:
     engine._walk_and_validate(str(tmp_path), config, all_files)  # pyright: ignore[reportPrivateUsage]
     
     assert engine.total_errors == 1
-    assert "Fehlendes Element: 'required_file.md'" in engine.results_tree["root"]["_errors"]
+    assert "Fehlendes Element: 'required_file.md': Datei/Ordner existiert nicht." in engine.results_tree["root"]["_errors"]
 
 def test_optional_flag(tmp_path: Any) -> None:
     linter_yaml = tmp_path / "linter.yaml"

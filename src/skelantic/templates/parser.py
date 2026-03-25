@@ -24,16 +24,33 @@ class LineNode(TemplateNode):
     regex: Optional[Pattern[str]] = None
 
 def get_regex_for_type(type_str: str) -> str:
+    # Check for bounded types like digit(1,5) or char(3)
+    bounded_match = re.match(r'^(digit|char)(?:\(([0-9,]+)\))?$', type_str)
+    if bounded_match:
+        base_type, var_args = bounded_match.groups()
+        char_regex = r"[a-zA-Z0-9]"
+        min_len, max_len = "1", "1"
+        if var_args:
+            if ',' in var_args:
+                parts = var_args.split(',')
+                min_len = parts[0].strip() or "0"
+                max_len = parts[1].strip() or ""
+            else:
+                min_len = var_args.strip()
+                max_len = var_args.strip()
+        quantifier = f"{{{min_len},{max_len}}}" if max_len else f"{{{min_len},}}"
+        
+        if base_type == "digit": return rf"\d{quantifier}"
+        if base_type == "char": return rf"{char_regex}{quantifier}"
+
     if type_str == "str": return r".+?"
-    elif type_str == "any": return r".*?"
-    elif type_str == "slug": return r"[a-zA-Z0-9-_]+"
+    elif type_str == "int": return r"0|[1-9]\d*"
     elif type_str == "camelCase": return r"[a-z][a-zA-Z0-9]*"
     elif type_str == "Pascal_Snake": return r"[A-Z][a-zA-Z0-9]*(?:_[A-Z][a-zA-Z0-9]*)*"
     elif type_str == "snake_case": return r"[a-z0-9]+(?:_+[a-z0-9]+)*"
     elif type_str == "kebab-case": return r"[a-z0-9]+(?:-[a-z0-9]+)*"
     elif type_str == "UPPER_SNAKE_CASE": return r"[A-Z0-9]+(?:_[A-Z0-9]+)*"
-    elif type_str == "int": return r"\d+"
-    elif type_str == "decimal": return r"\d+(?:\.\d+)?"
+    elif type_str == "decimal": return r"(?:0|[1-9]\d*)\.\d+"
     elif type_str == "bool": return r"true|false|True|False"
     elif type_str == "route": return r"\/?[a-zA-Z0-9\-\/\{\}_]*(?:\?[a-zA-Z0-9\-\_=&\{\},]+)?"       
     elif type_str.startswith("regex("):

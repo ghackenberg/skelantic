@@ -10,11 +10,11 @@ You extract values using the `{{name:type}}` syntax.
 | Type | Regex Behavior | Description |
 | :--- | :--- | :--- |
 | **`str`** | `.+?` | A single line of text (at least one character). |
-| **`any`** | `.*?` | Any text (can be empty). |
-| **`int`** | `\d+` | An integer number. |
-| **`decimal`** | `\d+(\.\d+)?` | A decimal number (optional dot). |
+| **`int`** | `0\|[1-9]\d*` | An integer number of variable length (cannot start with a zero unless the number is exactly 0). |
+| **`digit`** | `\d+` | A sequence of digits. Supports bounds: `digit(1,5)`. |
+| **`char`** | `[a-zA-Z0-9]+` | Alphanumeric characters. Supports bounds: `char(3)`. |
+| **`decimal`** | `(?:0\|[1-9]\d*)\.\d+` | A decimal number with a mandatory dot (cannot start with a zero unless it's exactly 0.). |
 | **`bool`** | `true\|false\|True\|False` | A boolean value (case-insensitive). |
-| **`slug`** | `[a-zA-Z0-9-_]+` | Alphanumeric with dashes/underscores. |
 | **`snake_case`** | `[a-z0-9]+(_[a-z0-9]+)*` | Lowercase words separated by underscores. |
 | **`kebab-case`** | `[a-z0-9]+(-[a-z0-9]+)*` | Lowercase words separated by dashes. |
 | **`camelCase`** | `[a-z][a-zA-Z0-9]*` | First word lowercase, following words capitalized. |
@@ -24,8 +24,8 @@ You extract values using the `{{name:type}}` syntax.
 
 *Example:*
 ```markdown
-# Server Config: {{server_name:slug}}
-Port: {{port:int}}
+# Server Config: {{server_name:kebab-case}}
+Port: {{port:digit(1,)}}
 Active: {{is_active:bool}}
 ```
 
@@ -50,7 +50,7 @@ Allows a section of the template to be matched 0 to N times. Extracts a list of 
 ```markdown
 ## Server Nodes
 [[repeat:nodes]]
-* Node: {{node_name:slug}} (IP: {{ip:str}})
+* Node: {{node_name:kebab-case}} (IP: {{ip:str}})
 [[/repeat]]
 ```
 *(Generates a `List[NodesItem]` in Pydantic)*

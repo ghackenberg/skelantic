@@ -10,16 +10,10 @@ def to_pascal(name: str) -> str:
     # Führende Punkte ersetzen
     if name.startswith('.'):
         name = "Dot-" + name[1:]
-        
-    # Wildcards ersetzen
-    if '**' in name:
-        name = name.replace('**', 'Glob')
-    if '*' in name:
-        name = name.replace('*', 'Any')
-        
+
     # Variablen {slug:words(1,5)} extrahieren
     name = re.sub(r'\{([a-zA-Z0-9_]+)[^}]*\}', lambda m: "-" + m.group(1).capitalize() + "-", name)
-        
+
     # Standard PascalCase (Bindestriche/Unterstriche entfernen)
     clean_name = "".join(x.title() for x in re.split(r'[-_./]', name) if x)
     
@@ -235,9 +229,11 @@ class CodeGenerator:
             if is_dir:
                 children: Dict[str, Dict[str, Any]] = {}
                 for f_name, f_conf in node_config.get('files', {}).items():
-                    children[f_name] = {'config': f_conf, 'is_dir': False}
+                    if not f_conf.get('ignore'):
+                        children[f_name] = {'config': f_conf, 'is_dir': False}
                 for d_name, d_conf in node_config.get('directories', {}).items():
-                    children[d_name] = {'config': d_conf, 'is_dir': True}
+                    if not d_conf.get('ignore'):
+                        children[d_name] = {'config': d_conf, 'is_dir': True}
                     
                 # Generate child properties first
                 for child_name, child_data in children.items():
