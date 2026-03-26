@@ -1,6 +1,7 @@
 import os
 import glob
 import re
+import keyword
 from typing import Any, Dict, List, cast
 from skelantic.templates.parser import TemplateParser, TemplateNode, LineNode
 from skelantic.commons.config import ConfigLoader
@@ -11,11 +12,14 @@ def to_pascal(name: str) -> str:
     if name.startswith('.'):
         name = "Dot-" + name[1:]
 
-    # Variablen {slug:words(1,5)} extrahieren
+    # Variablen {slug:char(1,)} extrahieren
     name = re.sub(r'\{([a-zA-Z0-9_]+)[^}]*\}', lambda m: "-" + m.group(1).capitalize() + "-", name)
 
-    # Standard PascalCase (Bindestriche/Unterstriche entfernen)
-    clean_name = "".join(x.title() for x in re.split(r'[-_./]', name) if x)
+    # Alle illegalen Zeichen durch Bindestrich ersetzen
+    name = re.sub(r'[^a-zA-Z0-9_-]', '-', name)
+
+    # Standard PascalCase (Bindestriche/Unterstriche/Punkte entfernen)
+    clean_name = "".join(x.title() for x in re.split(r'[-_.]', name) if x)
     
     if not clean_name:
         return "UnknownNode"
@@ -29,9 +33,13 @@ def to_pascal(name: str) -> str:
 def to_snake(name: str) -> str:
     """Konvertiert einen String (z.B. PascalCase) zu snake_case für Properties."""
     name = re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
+    # Handle reserved keywords
+    if keyword.iskeyword(name) or name in ["pass", "def", "class"]:
+        name += "_"
     return name
 
 def map_type(t_str: str) -> str:
+    if t_str.startswith('digit'): return 'int'
     if t_str == 'int': return 'int'
     if t_str == 'decimal': return 'float'
     if t_str == 'bool': return 'bool'
