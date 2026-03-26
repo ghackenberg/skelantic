@@ -32,11 +32,19 @@ When a validation fails or you need to write a new one:
 2. Run `skelantic info <target/path>` to get the exact **Node Type** for type-hinting.
 
 ### 4. The Validation Loop (Mandatory)
-After every task, execute this sequence:
-1. `skelantic generate` (Updates the types)
-2. `skelantic run` (Validates the repo)
-3. If errors occur, run `skelantic run -v` to see the detailed execution traces from the processors.
-4. Fix all reported `❌ Unerlaubte Datei` or `❌ Syntax-Fehler`.
+After every task (modifying configs, templates, or processors), execute the full verification pipeline:
+`skelantic verify`
+
+This command performs four critical steps:
+1. **Generate**: Updates the `RepoGraph` types.
+2. **Right**: Runs strict `pyright` checks on your code.
+3. **Test**: Runs `pytest` to ensure your processor logic is correct and has >= 90% coverage.
+4. **Run**: Validates the actual repository structure.
+
+**If any step fails:**
+- Run the specific command with `-v` (e.g., `skelantic run -v`) to see detailed traces.
+- Fix all reported errors before considering the task complete.
+- NEVER ignore Pyright errors or low test coverage.
 
 ## 📚 Detailed Documentation
 For deep dives into syntax, read these local files using your `read_file` tool:

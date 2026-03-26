@@ -27,7 +27,44 @@ skelantic run [options]
 ```
 
 **Arguments:**
-* `-v`, `--verbose`: Enables verbose matching logs.
+* `-v`, `--verbose`: Enables verbose matching logs and real-time trace outputs.
+
+---
+
+## `skelantic right`
+
+Runs strict static type checks using **Pyright**. It ensures that your processor functions are correctly typed and match the generated `RepoGraph`.
+
+**Usage:**
+```bash
+skelantic right
+```
+
+---
+
+## `skelantic test`
+
+Runs unit tests for your processors using **Pytest**. It automatically checks for test coverage against your processors directory (default: 90% threshold).
+
+**Usage:**
+```bash
+skelantic test
+```
+
+---
+
+## `skelantic verify`
+
+The **all-in-one** command for repository governance. It orchestrates the full quality pipeline:
+1. `skelantic generate`
+2. `skelantic right`
+3. `skelantic test`
+4. `skelantic run`
+
+**Usage:**
+```bash
+skelantic verify
+```
 
 ---
 

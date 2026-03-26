@@ -23,6 +23,7 @@ def test_cli_init(tmp_path, monkeypatch):
     assert (tmp_path / ".skelantic/version").read_text() == "0.2.0"
     assert (tmp_path / ".skelantic/settings.yaml").exists()
     assert (tmp_path / "tools/skelantic/processors").exists()
+    assert (tmp_path / "tools/skelantic/tests").exists()
     assert (tmp_path / ".gemini/skills/skelantic/SKILL.md").exists()
 
 def test_cli_run_and_generate(tmp_path, monkeypatch, capsys):
@@ -281,3 +282,48 @@ def test_cli_info_allowed_children(tmp_path, monkeypatch, capsys):
             assert "📁 Folders:" in out
             assert "📄 Files:" in out
             assert "item.md" in out
+
+def test_cli_right_command(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    
+    with patch('importlib.metadata.version', return_value='0.2.0'), \
+         patch('subprocess.run') as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        monkeypatch.setattr(sys, 'argv', ['skelantic', 'right'])
+        main()
+        mock_run.assert_called_once_with(["pyright", "."], capture_output=False)
+        assert "Next recommended step: 'skelantic test'" in capsys.readouterr().out
+
+def test_cli_test_command(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    
+    with patch('importlib.metadata.version', return_value='0.2.0'), \
+         patch('subprocess.run') as mock_run:
+        mock_run.return_value = MagicMock(returncode=0)
+        monkeypatch.setattr(sys, 'argv', ['skelantic', 'test'])
+        main()
+        # Should call pytest with default dirs
+        args, _ = mock_run.call_args
+        cmd = args[0]
+        assert "pytest" in cmd
+        assert "tools/skelantic/tests" in cmd
+        assert "--cov=tools/skelantic/processors" in cmd
+        assert "Next recommended step: 'skelantic run'" in capsys.readouterr().out
+
+def test_cli_verify_command(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    
+    with patch('importlib.metadata.version', return_value='0.2.0'), \
+         patch('subprocess.run') as mock_run:
+        monkeypatch.setattr(sys, 'argv', ['skelantic', 'verify'])
+        main()
+        # Should call all 4 steps
+        assert mock_run.call_count == 4
+        calls = [c.args[0][1] for c in mock_run.call_args_list]
+        assert calls == ["generate", "right", "test", "run"]
