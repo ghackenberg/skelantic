@@ -60,15 +60,11 @@ class LinterEngine:
         self._walk_and_validate(base_dir, self.config, all_files, rel_path=".")
         self._run_templates(all_files)
         
-        # Bestimme alle registrierten Phasen
+        # Bestimme alle registrierten Phasen dynamisch
         all_phases = sorted(list(set(b.phase for b in self.registry.bindings if b.phase is not None)))
         
         for phase in all_phases:
-            # 1. Lokale Phase (für alle Dateien/Ordner)
             self._run_phase(phase, all_files)
-            
-            # 2. Globale Phase (nur für 'root' Bindings)
-            self._run_global_phase(phase)
 
     def _run_templates(self, files_data: List[Dict[str, Any]]) -> None:
         for f_data in files_data:
@@ -161,24 +157,24 @@ class LinterEngine:
                 if binding.phase != phase:
                     continue
                 
-                # Global rules (match="root") are run separately in _run_global_phase
+                # Check if it matches this node
+                is_match = False
                 if binding.match == "root":
+                    if rp == ".": is_match = True
+                elif binding.regex:
+                    if binding.regex.match(rp): is_match = True
+                else:
+                    # No explicit match -> fallback to type-based only
+                    is_match = True
+
+                if not is_match:
                     continue
 
+                # Type Hint Match
                 sig = inspect.signature(binding.func)
                 params = list(sig.parameters.values())
                 node_param = next((p for p in params if p.name == 'node'), None)
-
-                # 1. Regex Match (if provided)
-                if binding.regex:
-                    if not binding.regex.match(rp):
-                        continue
-                elif not node_param:
-                    # No regex AND no node param -> This is a pure global processor.
-                    # We skip it here, it will run in _run_global_phase.
-                    continue
                 
-                # 2. Type Hint Match (if 'node' parameter is present)
                 if node_param and node_param.annotation != inspect.Parameter.empty:
                     anno = node_param.annotation
                     # Handle forward references
@@ -189,16 +185,15 @@ class LinterEngine:
                         except Exception: pass
                     
                     try:
-                        # Robust check for types and Union types
                         if not isinstance(anno, str):
-                            if not isinstance(node, anno):
-                                continue
+                            # Skip check if annotation is Any
+                            if anno is not Any:
+                                if not isinstance(node, anno):
+                                    continue
                         else:
                             # If eval failed and it's still a string, we can't reliably match
                             continue
                     except TypeError:
-                        # Complex typing construct that doesn't support isinstance
-                        # We skip to be safe
                         continue
                         
                 self._execute_rule(binding.func, binding.name, node, f_data)
@@ -246,59 +241,29 @@ class LinterEngine:
         try:
             res = func(**kwargs)
             if res:
-                if f_data:
-                    if current_traces:
-                        safe_path = f_data['rel_path'].replace('/', '_').replace('\\', '_')
-                        trace_dir = os.path.join(os.getcwd(), ".skelantic", "traces")
-                        os.makedirs(trace_dir, exist_ok=True)
-                        trace_file = os.path.join(trace_dir, f"{rule_name}_{safe_path}.log")
-                        with open(trace_file, "w", encoding="utf-8") as f:
-                            f.write("\n".join(current_traces))
-                        res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
-                    self._add_results("ERROR", f_data['rel_path'] if f_data else "root", res, origin=origin)
-                else:
-                    self._add_results("WARNING", "root", res, origin=origin)
+                # Determince if it's a global check based on node path
+                is_global = (node.rel_path.as_posix() == "." if node and hasattr(node, 'rel_path') else (f_data is None))
+                severity = "WARNING" if is_global else "ERROR"
+                target_path = f_data['rel_path'] if f_data else "root"
+
+                if current_traces:
+
+                    safe_path = target_path.replace('/', '_').replace('\\', '_')
+                    trace_dir = os.path.join(os.getcwd(), ".skelantic", "traces")
+                    os.makedirs(trace_dir, exist_ok=True)
+                    trace_file = os.path.join(trace_dir, f"{rule_name}_{safe_path}.log")
+                    with open(trace_file, "w", encoding="utf-8") as f:
+                        f.write("\n".join(current_traces))
+                    res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
+                
+                self._add_results(severity, target_path, res, origin=origin)
             return res or []
         except Exception as e:
-            prefix = "Global " if f_data is None else ""
+            # Check if it's a global check for prefix
+            is_global = (node.rel_path.as_posix() == "." if node and hasattr(node, 'rel_path') else False)
+            prefix = "Global " if is_global else ""
             self._add_results("ERROR", f_data['rel_path'] if f_data else "root", [f"{prefix}Crash '{rule_name}': {e}"], origin=origin)
             return []
-
-    def _run_global_phase(self, phase: int) -> None:
-        for binding in self.registry.bindings:
-            if binding.phase != phase:
-                continue
-            
-            is_explicit_root = (binding.match == "root")
-            
-            # Check if it's a pure global processor (no node, no regex)
-            sig = inspect.signature(binding.func)
-            params = list(sig.parameters.values())
-            node_param = next((p for p in params if p.name == 'node'), None)
-            is_pure_global = (not node_param and not binding.regex and binding.match is None)
-            
-            if not is_explicit_root and not is_pure_global:
-                continue
-            
-            # For global phase, the node is the root node (.)
-            root_node = self.ctx.get_node(".")
-            
-            # Check type matching for explicit root nodes
-            if is_explicit_root and node_param and node_param.annotation != inspect.Parameter.empty:
-                anno = node_param.annotation
-                if isinstance(anno, str) and self.types_module:
-                    try:
-                        type_env = cast(Dict[str, Any], vars(self.types_module))
-                        anno = eval(anno, type_env)
-                    except Exception: pass
-                
-                try:
-                    if not isinstance(anno, str) and not isinstance(root_node, anno):
-                        continue
-                except TypeError:
-                    continue
-
-            self._execute_rule(binding.func, binding.name, root_node, None)
 
     def _add_results(self, severity: str, full_rel_path: str, results: List[str], origin: Optional[Dict[str, Any]] = None) -> None:
         if not results: return

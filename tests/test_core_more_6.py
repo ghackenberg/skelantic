@@ -6,7 +6,7 @@ def test_core_run_global_phase_success():
     engine = LinterEngine(registry)
     engine.registry.bindings = []
     
-    def good_global_rule():
+    def good_global_rule(node, tracer):
         return ["global warning"]
         
     class MockBinding:
@@ -17,7 +17,7 @@ def test_core_run_global_phase_success():
         regex = None
         
     engine.registry.bindings = [MockBinding]
-    engine._run_global_phase(3)
+    engine._run_phase(3, [{'rel_path': '.', 'abs_path': 'root', 'is_directory': True}])
     assert engine.total_warnings == 1
     assert any("global warning" in w['msg'] for w in engine.results_tree['root']['_warnings'])
 
@@ -25,7 +25,7 @@ def test_core_global_phase_crash():
     engine = LinterEngine(registry)
     engine.registry.bindings = []
     
-    def bad_global_rule():
+    def bad_global_rule(node, tracer):
         raise ValueError("global boom")
         
     class MockBinding:
@@ -36,6 +36,6 @@ def test_core_global_phase_crash():
         regex = None
         
     engine.registry.bindings = [MockBinding]
-    engine._run_global_phase(3)
+    engine._run_phase(3, [{'rel_path': '.', 'abs_path': 'root', 'is_directory': True}])
     assert engine.total_errors == 1
     assert "Global Crash 'bad_global_rule': global boom" in engine.results_tree['root']['_errors'][0]['msg']

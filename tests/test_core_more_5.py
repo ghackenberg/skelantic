@@ -65,10 +65,9 @@ def test_core_run_phase_pydantic_exception():
 def test_core_global_phase_crash():
     engine = LinterEngine(registry)
     
-    def bad_global_rule():
+    def bad_global_rule(node, tracer):
         raise ValueError("global boom")
         
-    # Mock registry to return our bad rule
     class MockBinding:
         phase = 3
         match = "root"
@@ -77,8 +76,7 @@ def test_core_global_phase_crash():
         regex = None
         
     engine.registry.bindings = [MockBinding]
-    
-    engine._run_global_phase(3)
+    engine._run_phase(3, [{'rel_path': '.', 'abs_path': 'root', 'is_directory': True}])
     assert engine.total_errors == 1
     assert "Global Crash 'bad_global_rule': global boom" in engine.results_tree['root']['_errors'][0]['msg']
 

@@ -3,7 +3,7 @@ import os
 from typing import List, Set, Callable
 from pydantic import BaseModel, Field
 from .decorators import processor
-from .nodes import MarkdownNode
+from .nodes import FSNode, MarkdownNode
 
 # --- GLOBAL STATE ---
 
@@ -60,7 +60,7 @@ def build_document_graph(node: MarkdownNode, state: GlobalMetadataState, tracer:
         state.referenced_markdown_files.add(target_abs_path)
 
 @processor(match="root", phase=3)
-def check_orphaned_documents(state: GlobalMetadataState, tracer: Callable[[str], None]) -> List[str]:
+def check_orphaned_documents(node: FSNode, state: GlobalMetadataState, tracer: Callable[[str], None]) -> List[str]:
     """Identifiziert Dateien, die im Repository existieren, aber von keiner anderen Datei verlinkt werden."""
     tracer("Suche nach verwaisten Dokumenten")
     warnings: List[str] = []

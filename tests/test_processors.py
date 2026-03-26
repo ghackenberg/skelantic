@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 from pathlib import Path
 
 from skelantic.commons.processors import dead_link, build_document_graph, check_orphaned_documents, backlink_enforcement, GlobalMetadataState
-from skelantic.commons.nodes import MarkdownNode, FileNode
+from skelantic.commons.nodes import MarkdownNode, FileNode, FSNode
 
 def test_dead_link(tmp_path):
     """Prüft, ob tote Links erkannt werden."""
@@ -57,7 +57,7 @@ def test_check_orphaned_documents():
     state.all_markdown_files = {"/a.md", "/b.md"}
     state.referenced_markdown_files = {"/a.md"}
     
-    res = check_orphaned_documents(state, lambda x: None)
+    res = check_orphaned_documents(Mock(spec=FSNode), state, lambda x: None)
     assert len(res) == 1
     assert "b.md" in res[0]
 
@@ -137,7 +137,7 @@ def test_check_orphaned_documents_error():
     state.all_markdown_files = {"/invalid/path.md"}
     # os.path.relpath will fail if path is invalid or on different drive
     with patch("os.path.relpath", side_effect=ValueError):
-        res = check_orphaned_documents(state, lambda x: None)
+        res = check_orphaned_documents(Mock(spec=FSNode), state, lambda x: None)
         assert res == []
 
 def test_check_orphaned_documents_success():
@@ -145,7 +145,7 @@ def test_check_orphaned_documents_success():
     state = GlobalMetadataState()
     state.all_markdown_files = {"/a/b/test.md"}
     with patch("os.path.relpath", return_value="a/b/test.md"):
-        res = check_orphaned_documents(state, lambda x: None)
+        res = check_orphaned_documents(Mock(spec=FSNode), state, lambda x: None)
         assert len(res) == 1
         assert "a/b/test.md" in res[0]
 

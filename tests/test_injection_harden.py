@@ -76,11 +76,12 @@ def test_global_node_injection():
     mock_b.func = global_proc
     mock_b.name = "global_proc"
     mock_b.match = "root"
+    mock_b.regex = None
     
     reg.bindings = [mock_b]
     
     # Should find root node and inject it
-    engine._run_global_phase(3)
+    engine._run_phase(3, [{'rel_path': '.', 'abs_path': 'abs_root', 'is_directory': True}])
     # Check results
     assert any("root_found" in e['msg'] for e in engine.results_tree['root']['_warnings'])
 

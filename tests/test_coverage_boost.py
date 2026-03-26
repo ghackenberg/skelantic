@@ -46,14 +46,12 @@ def test_engine_dynamic_phases():
     
     with patch.object(engine, '_walk_and_validate'), \
          patch.object(engine, '_run_templates'), \
-         patch.object(engine, '_run_phase') as mock_lp, \
-         patch.object(engine, '_run_global_phase') as mock_gp:
+         patch.object(engine, '_run_phase') as mock_lp:
         
         engine.run(".")
         
         # Phases 5 and 10 should be executed
         assert mock_lp.call_count == 2
-        assert mock_gp.call_count == 2
         
         # Check order
         calls_lp = [c.args[0] for c in mock_lp.call_args_list]

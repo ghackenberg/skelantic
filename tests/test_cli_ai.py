@@ -130,6 +130,20 @@ def test_cli_errors_missing_settings(tmp_path, monkeypatch, capsys):
             with pytest.raises(SystemExit): main()
             assert "ERROR: 'types_module' is not defined" in capsys.readouterr().out
 
+def test_processor_node_enforcement():
+    from skelantic.commons.decorators import processor
+    def p_no_node(tracer): return []
+    with pytest.raises(ValueError) as exc:
+        processor()(p_no_node)
+    assert "must accept a 'node' parameter" in str(exc.value)
+
+def test_processor_tracer_enforcement():
+    from skelantic.commons.decorators import processor
+    def p_no_tracer(node): return []
+    with pytest.raises(ValueError) as exc:
+        processor()(p_no_tracer)
+    assert "must accept a 'tracer' parameter" in str(exc.value)
+
 def test_processor_docstring_enforcement():
     from skelantic.commons.decorators import processor
     def p_no_doc(node, tracer): return []

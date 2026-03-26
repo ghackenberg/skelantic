@@ -117,13 +117,11 @@ def test_linter_engine_init_and_run(tmp_path: Any) -> None:
     with patch.object(engine.registry, 'bindings', [mock_binding1, mock_binding2]):
         with patch.object(engine, '_walk_and_validate') as mock_walk, \
              patch.object(engine, '_run_templates') as mock_tmpl, \
-             patch.object(engine, '_run_phase') as mock_phase, \
-             patch.object(engine, '_run_global_phase') as mock_global:
+             patch.object(engine, '_run_phase') as mock_phase:
             engine.run(str(tmp_path))
             mock_walk.assert_called_once()
             mock_tmpl.assert_called_once()
             assert mock_phase.call_count == 2
-            assert mock_global.call_count == 2
 
 def test_linter_engine_log(capsys: Any) -> None:
     engine = LinterEngine(registry, verbose=True, models_module="test_models")
@@ -238,22 +236,30 @@ def test_execute_rule_success_and_crash() -> None:
     assert engine.total_errors == 3
     assert any("Crash 'crash_rule': boom" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
 
-def test_run_global_phase() -> None:
+def test_run_phase_with_root_processor() -> None:
     engine = LinterEngine(registry, models_module="test_models")
+
+    def my_global_proc(node: Any, tracer: Any) -> List[str]:
+        return ["global warn"]
+
     mock_binding = MagicMock()
     mock_binding.phase = 3
     mock_binding.match = "root"
-    mock_binding.func = MagicMock(return_value=["global warn"])
+    mock_binding.func = my_global_proc
     mock_binding.name = "global_rule"
-    
+    mock_binding.regex = None
+
     engine.registry.bindings = [mock_binding]
-    engine._run_global_phase(3)
+    engine._run_phase(3, [{'rel_path': '.', 'abs_path': '/fake', 'is_directory': True}])
     assert engine.total_warnings == 1
     assert any("global warn" in w['msg'] for w in engine.results_tree['root']['_warnings'])
     
     # Test crash
-    mock_binding.func.side_effect = ValueError("boom")
-    engine._run_global_phase(3)
+    def crash_proc(node: Any, tracer: Any) -> List[str]:
+        raise ValueError("boom")
+    
+    mock_binding.func = crash_proc
+    engine._run_phase(3, [{'rel_path': '.', 'abs_path': '/fake', 'is_directory': True}])
     assert engine.total_errors == 1
     assert any("Global Crash 'global_rule': boom" in e['msg'] for e in engine.results_tree['root']['_errors'])
 

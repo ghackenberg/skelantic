@@ -26,13 +26,22 @@ def processor(match: Optional[str] = None, phase: int = 2) -> Callable[[Callable
     """
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         sig = inspect.signature(func)
-        if 'tracer' not in sig.parameters:
+        params = sig.parameters
+        
+        if 'node' not in params:
             try:
                 f_path = inspect.getfile(func)
                 _, line = inspect.getsourcelines(func)
                 loc = f" in '{f_path}:{line}'"
-            except Exception:
-                loc = ""
+            except Exception: loc = ""
+            raise ValueError(f"Processor function '{func.__name__}'{loc} must accept a 'node' parameter with a type hint.")
+
+        if 'tracer' not in params:
+            try:
+                f_path = inspect.getfile(func)
+                _, line = inspect.getsourcelines(func)
+                loc = f" in '{f_path}:{line}'"
+            except Exception: loc = ""
             raise ValueError(f"Processor function '{func.__name__}'{loc} must accept a 'tracer' parameter (usually 'tracer: Callable[[str], None]').")
 
         if not func.__doc__ or not func.__doc__.strip():
