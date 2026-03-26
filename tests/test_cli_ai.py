@@ -94,6 +94,7 @@ def test_cli_info_with_processors(tmp_path, monkeypatch, capsys):
 def test_cli_template(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
     (tmp_path / ".skelantic/config.yaml").write_text("files: {'test.md': {template: 't.md'}}", encoding="utf-8")
     (tmp_path / "t.md").write_text("CONTENT")
     with open(tmp_path / ".skelantic/settings.yaml", "w") as f:
@@ -142,6 +143,16 @@ def test_processor_docstring_enforcement_inspect_fail():
         assert "must have a docstring" in str(exc.value)
         assert " in '" not in str(exc.value) # No location info
 
+def test_cli_version_check_missing_file(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, 'argv', ['skelantic', 'run'])
+    with patch('importlib.metadata.version', return_value='0.2.0'):
+        with pytest.raises(SystemExit):
+            main()
+        out = capsys.readouterr().out
+        assert "Repository is not initialized" in out
+        assert "skelantic init" in out
+
 def test_cli_migrate_success(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, 'argv', ['skelantic', 'migrate'])
@@ -158,8 +169,6 @@ def test_cli_resolver_base(tmp_path):
     
     resolver = PathResolver({})
     res = resolver.resolve("test.md", base_dir=str(tmp_path))
-    if res is None:
-        print(f"DEBUG: Config file content: {(tmp_path / '.skelantic/config.yaml').read_text()}")
     assert res is not None
     assert res.match_path == "test.md"
     assert res.is_directory == False

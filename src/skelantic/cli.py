@@ -49,12 +49,15 @@ def _save_settings(settings: Dict[str, str]) -> None:
         yaml.dump(settings, f, default_flow_style=False)
 
 def _check_version(command: str) -> None:
-    if command in ["init", "migrate", "info", "template"]:
-        return # Skip check for these commands or handle specifically
+    if command in ["init", "migrate"]:
+        return # Skip check for life-cycle commands
         
     installed, repo = _get_versions()
     if repo == "unknown":
-        return # Probably not a skelantic project yet
+        print(f"❌ ERROR: Repository is not initialized with Skelantic.")
+        print(f"👉 For new projects, run: 'skelantic init'")
+        print(f"👉 For existing projects, run: 'skelantic migrate'")
+        sys.exit(1)
         
     if installed != repo:
         if installed < repo:
