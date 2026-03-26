@@ -193,7 +193,7 @@ def main() -> None:
 
         elif args.command == "right":
             print("🔍 Running strict type checks (Pyright)...")
-            res = subprocess.run(["pyright", "."], capture_output=False)
+            res = subprocess.run([sys.executable, "-m", "pyright", "."], capture_output=False)
             if res.returncode == 0:
                 success = True
                 next_cmd = "test"
@@ -207,7 +207,7 @@ def main() -> None:
             print(f"🧪 Running unit tests in '{t_dir}'...")
             
             # Ensure coverage is checked for processors
-            res = subprocess.run(["pytest", t_dir, f"--cov={p_dir}", "--cov-report=term-missing", "--cov-fail-under=90"], capture_output=False)
+            res = subprocess.run([sys.executable, "-m", "pytest", t_dir, f"--cov={p_dir}", "--cov-report=term-missing", "--cov-fail-under=90"], capture_output=False)
             if res.returncode == 0:
                 success = True
                 next_cmd = "run"
@@ -219,16 +219,16 @@ def main() -> None:
             print("🚀 Starting full verification pipeline...")
             
             print("\nStep 1/4: Generating types...")
-            subprocess.run(["skelantic", "generate"], check=True)
+            subprocess.run([sys.executable, "-m", "skelantic", "generate"], check=True)
             
             print("\nStep 2/4: Checking types...")
-            subprocess.run(["skelantic", "right"], check=True)
+            subprocess.run([sys.executable, "-m", "skelantic", "right"], check=True)
             
             print("\nStep 3/4: Running tests...")
-            subprocess.run(["skelantic", "test"], check=True)
+            subprocess.run([sys.executable, "-m", "skelantic", "test"], check=True)
             
             print("\nStep 4/4: Validating repository...")
-            subprocess.run(["skelantic", "run"], check=True)
+            subprocess.run([sys.executable, "-m", "skelantic", "run"], check=True)
             
             print("\n✨ ALL CHECKS PASSED: Repository is 100% compliant and tested.")
             return

@@ -293,7 +293,7 @@ def test_cli_right_command(tmp_path, monkeypatch, capsys):
         mock_run.return_value = MagicMock(returncode=0)
         monkeypatch.setattr(sys, 'argv', ['skelantic', 'right'])
         main()
-        mock_run.assert_called_once_with(["pyright", "."], capture_output=False)
+        mock_run.assert_called_once_with([sys.executable, "-m", "pyright", "."], capture_output=False)
         assert "Next recommended step: 'skelantic test'" in capsys.readouterr().out
 
 def test_cli_test_command(tmp_path, monkeypatch, capsys):
@@ -309,6 +309,8 @@ def test_cli_test_command(tmp_path, monkeypatch, capsys):
         # Should call pytest with default dirs
         args, _ = mock_run.call_args
         cmd = args[0]
+        assert sys.executable in cmd
+        assert "-m" in cmd
         assert "pytest" in cmd
         assert "tools/skelantic/tests" in cmd
         assert "--cov=tools/skelantic/processors" in cmd
@@ -325,5 +327,5 @@ def test_cli_verify_command(tmp_path, monkeypatch, capsys):
         main()
         # Should call all 4 steps
         assert mock_run.call_count == 4
-        calls = [c.args[0][1] for c in mock_run.call_args_list]
+        calls = [c.args[0][3] for c in mock_run.call_args_list]
         assert calls == ["generate", "right", "test", "run"]
