@@ -18,18 +18,18 @@ You are an expert at managing repositories governed by the Skelantic framework. 
 
 ### 1. Planning a Change
 Before creating a new file or directory, ALWAYS run:
-`skelantic info <intended/path>`
-This will tell you if the path is allowed, which variables are required, and which template applies.
+* `skelantic info <intended/path>`: Tells you if the path is allowed and which types apply.
+* `skelantic processors`: Gives you a global overview of all active validation rules and their documentation.
 
 ### 2. Creating a File
 To understand the required content structure for a file, run:
 `skelantic template <intended/path>`
 This returns the raw Skeletal Template. NEVER guess the Markdown structure.
 
-### 3. Implementing a Processor
-When writing a Python processor, run:
-`skelantic info <target/path>`
-Copy the **Node Type** and the **Template Data** schema directly into your Python code to ensure perfect Dependency Injection and type safety.
+### 3. Implementing or Fixing a Processor
+When a validation fails or you need to write a new one:
+1. Run `skelantic processors` to find the physical file and function responsible for the rule.
+2. Run `skelantic info <target/path>` to get the exact **Node Type** for type-hinting.
 
 ### 4. The Validation Loop (Mandatory)
 After every task, execute this sequence:

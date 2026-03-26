@@ -2,16 +2,23 @@
 
 Skelantic operates in four distinct passes (phases). Understanding these phases, how the `RepoGraph` translates into strongly-typed nodes, and how Dependency Injection works is key to writing powerful, repository-wide validations.
 
-## 1. The 4 Processing Phases
+## 1. Dynamic Processing Phases
 
-When the engine runs (`skelantic run`), it executes the following sequence:
+When the engine runs (`skelantic run`), it discovers all registered phase numbers from the `@processor` decorators and executes them in ascending order. Each phase consists of a **Local Pass** (per node) and a **Global Pass** (root only).
 
-| Phase | Name | Description |
-| :--- | :--- | :--- |
-| **Pass 0** | **Template Matching & Graph Generation** | Verifies documents against [Skeletal Templates](templates.md). The engine automatically generates your `RepoGraph`, instantiates the correct specific node classes, and validates the extracted text against generated Pydantic models. |
-| **Pass 1** | **Indexing** | Executes Python processors (`phase=1`) designed to collect data for later global checks (e.g., collecting all Markdown file paths into a global state). |
-| **Pass 2** | **Validation** | Executes domain-specific Python processors (`phase=2`) on a per-file or per-directory basis to check constraints. This is where most of your business logic lives. |
-| **Pass 3** | **Global Pass** | Executes system-wide checks (`phase=3`) (e.g., finding orphaned documents that were never linked to). |
+Common phases used in the architecture:
+
+| Phase | Recommendation |
+| :--- | :--- |
+| **Pass 0** | **Implicit: Template Matching** (Always runs first). |
+| **Phase 1** | **Indexing**: Collect data into global Singleton state models. |
+| **Phase 2** | **Validation**: Domain-specific logic on a per-node basis. |
+| **Phase 3** | **Global Pass**: Repository-wide integrity checks. |
+
+*You can use any integer for a phase to define your own execution order.*
+
+To see exactly when each processor runs, use:
+`skelantic processors`
 
 ## 2. Type-Based Matching
 

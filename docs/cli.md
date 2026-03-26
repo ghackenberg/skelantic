@@ -19,6 +19,8 @@ processors_package: "tools.skelantic.processors"
 
 Executes the Skelantic workflow engine. It validates the repository against the configuration and executes custom Python processor functions. **It always operates on the Current Working Directory (CWD).**
 
+The output is grouped by file and processor (`⚙️ module:method`) for maximum readability.
+
 **Usage:**
 ```bash
 skelantic run [options]
@@ -26,6 +28,23 @@ skelantic run [options]
 
 **Arguments:**
 * `-v`, `--verbose`: Enables verbose matching logs.
+
+---
+
+## `skelantic processors`
+
+Lists all registered processors (internal and custom) and their metadata. This is the primary way to discover which logic governs your repository.
+
+**Usage:**
+```bash
+skelantic processors
+```
+
+The command displays:
+* **Execution Phase**: When the processor runs.
+* **Match Pattern**: Which files/directories are targeted.
+* **Source File**: The physical location of the logic.
+* **Docstring**: The semantic description of the rule.
 
 ---
 

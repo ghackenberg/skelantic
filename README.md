@@ -144,7 +144,7 @@ skelantic run
 * **File System ORM:** Skelantic translates your `config.yaml` into a nested, strictly typed class hierarchy (`RepoGraph`). You can navigate the file system type-safely via properties like `node.parent_node` and generated child properties (e.g. `node.readme_md`).
 * **State Dependency Injection:** Need to aggregate data across files? Define a custom Pydantic `BaseModel` for your state and add it to your processor's signature. Skelantic automatically instantiates and injects the singleton!
 * **Strictness Flags:** In your `config.yaml`, use `optional: true` for warnings instead of errors, `silent: true` to suppress warnings, or `ignore: true` to completely exclude nodes like caches from the structural graph.
-* **CLI Settings:** Store your project-specific paths in `.skelantic/settings.yaml` to enable parameterless CLI usage.
+* **CLI Power:** Parameterless usage with `.skelantic/settings.yaml`, path inspection with `skelantic info`, and logic discovery with `skelantic processors`.
 
 ## 🤝 Contributing
 

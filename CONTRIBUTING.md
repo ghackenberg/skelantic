@@ -9,16 +9,23 @@ Skelantic is a framework for file-tree processing and repository governance. It 
 1. **The Parsing Engine (`skelantic.templates`)**: Responsible for reading "Skeletal Templates", compiling them into a matching AST, and extracting raw text into structured dictionaries (and eventually Pydantic models).
 2. **The Workflow Engine (`skelantic.commons`)**: Responsible for crawling the file system based on `config.yaml` files, executing the matching process, and running the decorated `@processor` functions in sequence.
 
-### The 4 Processing Phases (Passes)
+### Dynamic Processing Phases
 
-When the engine runs (`engine.run()`), it executes the following sequence:
+When the engine runs (`engine.run()`), it discovers all registered phase numbers from the `@processor` decorators and executes them in ascending order. Each phase consists of two steps:
 
-| Phase | Name | Description |
-| :--- | :--- | :--- |
-| **Pass 0** | **Template Matching & Graph Generation** | Verifies documents against Skeletal Templates using the custom AST parser (`SkeletalMatcher`) and extracts raw data. The Engine then resolves the appropriate `RepoGraph` class, instantiates it, and automatically injects the validated Pydantic models into the node. |
-| **Pass 1** | **Indexing** | Executes Python processors (`phase=1`) designed to collect data for later global checks (e.g., collecting all Markdown file paths). |
-| **Pass 2** | **Validation** | Executes domain-specific Python processors (`phase=2`) on a per-file or per-directory basis to check constraints. |
-| **Pass 3** | **Global Pass** | Executes system-wide checks (`phase=3`) (e.g., finding orphaned documents that were never linked to). |
+1. **Local Pass**: Executes all processors matched to specific files or directories (including type-based matches).
+2. **Global Pass**: Executes all processors matched to `"root"`.
+
+Commonly used phases are:
+
+| Phase | Recommended Use |
+| :--- | :--- |
+| **Pass 0** | **Implicit: Template Matching** (Always runs first, extracting data into `node.data`). |
+| **Pass 1** | **Indexing**: Collect data into global Pydantic state models. |
+| **Pass 2** | **Validation**: Perform per-node constraints and checks. |
+| **Pass 3** | **Global Checks**: Perform repository-wide validations (e.g., finding orphaned files). |
+
+*Note: You can define any integer as a phase (e.g., `phase=10`) to insert logic between or after these standard steps.*
 
 ## 🛠️ Local Development Setup
 
