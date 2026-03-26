@@ -13,4 +13,4 @@ def test_core_run_templates_exceptions():
                 engine._run_templates(files_data)
                 
     assert engine.total_errors == 1
-    assert "Template Error: parse error" in engine.results_tree['test.md']['_errors'][0]
+    assert "Template Error: parse error" in engine.results_tree['test.md']['_errors'][0]['msg']

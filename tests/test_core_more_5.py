@@ -80,7 +80,7 @@ def test_core_global_phase_crash():
     
     engine._run_global_phase(3)
     assert engine.total_errors == 1
-    assert "Global Crash 'bad_global_rule': global boom" in engine.results_tree['root']['_errors'][0]
+    assert "Global Crash 'bad_global_rule': global boom" in engine.results_tree['root']['_errors'][0]['msg']
 
 def test_core_walk_and_validate_directories(tmp_path):
     engine = LinterEngine(registry)

@@ -185,7 +185,17 @@ class LinterEngine:
             elif param_name == 'tracer': kwargs['tracer'] = tracer
             else:
                 self._log(f"Warning: Argument '{param_name}' requested by processor '{rule_name}' cannot be injected. Only 'node', 'tracer', and Pydantic state models are supported.", level="WARNING")
-                
+        
+        origin = None
+        try:
+            origin = {
+                'method': func.__name__,
+                'module': func.__module__,
+                'file': os.path.relpath(inspect.getfile(func), os.getcwd()).replace('\\', '/'),
+                'doc': (func.__doc__ or "").strip().split('\n')[0]
+            }
+        except: pass
+
         try:
             res = func(**kwargs)
             if res:
@@ -198,13 +208,13 @@ class LinterEngine:
                         with open(trace_file, "w", encoding="utf-8") as f:
                             f.write("\n".join(current_traces))
                         res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
-                    self._add_results("ERROR", f_data['rel_path'], res)
+                    self._add_results("ERROR", f_data['rel_path'], res, origin=origin)
                 else:
-                    self._add_results("WARNING", "root", res)
+                    self._add_results("WARNING", "root", res, origin=origin)
             return res or []
         except Exception as e:
             prefix = "Global " if f_data is None else ""
-            self._add_results("ERROR", f_data['rel_path'] if f_data else "root", [f"{prefix}Crash '{rule_name}': {e}"])
+            self._add_results("ERROR", f_data['rel_path'] if f_data else "root", [f"{prefix}Crash '{rule_name}': {e}"], origin=origin)
             return []
 
     def _run_global_phase(self, phase: int) -> None:
@@ -214,21 +224,20 @@ class LinterEngine:
             if binding.match != "root" and binding.match is not None:
                 continue
                 
-            res = self._execute_rule(binding.func, binding.name, None, None)
-            if res:
-                self._add_results("WARNING", "root", res)
+            self._execute_rule(binding.func, binding.name, None, None)
 
-    def _add_results(self, severity: str, full_rel_path: str, results: List[str]) -> None:
+    def _add_results(self, severity: str, full_rel_path: str, results: List[str], origin: Optional[Dict[str, Any]] = None) -> None:
         if not results: return
         parts = full_rel_path.split('/') if full_rel_path not in ['.', ''] else ['root']
         current_node = self.results_tree
         for part in parts: current_node = current_node[part]
         if '_errors' not in current_node: current_node['_errors'], current_node['_warnings'] = [], []
         for msg in results:
+            entry = {'msg': msg, 'origin': origin}
             if severity == "ERROR":
-                if msg not in current_node['_errors']: current_node['_errors'].append(msg); self.total_errors += 1
+                if entry not in current_node['_errors']: current_node['_errors'].append(entry); self.total_errors += 1
             else:
-                if msg not in current_node['_warnings']: current_node['_warnings'].append(msg); self.total_warnings += 1
+                if entry not in current_node['_warnings']: current_node['_warnings'].append(entry); self.total_warnings += 1
 
     def _print_node(self, name: str, node: Any, indent: int = 0) -> None:
         prefix = "   " * indent
@@ -236,8 +245,25 @@ class LinterEngine:
             print(f"{prefix}{'📄' if '.' in name else '📁'} {name}{'/' if '.' not in name else ''}")
             indent += 1
             prefix = "   " * indent
-        for w in node.get('_warnings', []): print(f"{prefix}⚠️ {w}")
-        for e in node.get('_errors', []): print(f"{prefix}❌ {e}")
+        
+        for w in node.get('_warnings', []):
+            msg = w['msg'] if isinstance(w, dict) else w
+            print(f"{prefix}⚠️ {msg}")
+            if isinstance(w, dict) and w.get('origin'):
+                o = w['origin']
+                print(f"{prefix}   [Processor: {o['method']} ({o['module']})]")
+                print(f"{prefix}   [File:      {o['file']}]")
+                if o['doc']: print(f"{prefix}   [Doc:       {o['doc']}]")
+
+        for e in node.get('_errors', []):
+            msg = e['msg'] if isinstance(e, dict) else e
+            print(f"{prefix}❌ {msg}")
+            if isinstance(e, dict) and e.get('origin'):
+                o = e['origin']
+                print(f"{prefix}   [Processor: {o['method']} ({o['module']})]")
+                print(f"{prefix}   [File:      {o['file']}]")
+                if o['doc']: print(f"{prefix}   [Doc:       {o['doc']}]")
+
         for child_name, child_node in sorted(node.items()):
             if child_name not in ['_errors', '_warnings']: self._print_node(child_name, child_node, indent)
 

@@ -27,7 +27,7 @@ def test_strict_by_default(tmp_path: Any) -> None:
     engine._walk_and_validate(str(tmp_path), config, all_files)  # pyright: ignore[reportPrivateUsage]
     
     assert engine.total_errors == 1
-    assert "Fehlendes Element: 'required_file.md': Datei/Ordner existiert nicht." in engine.results_tree["root"]["_errors"]
+    assert any("Fehlendes Element: 'required_file.md'" in e['msg'] for e in engine.results_tree["root"]["_errors"])
 
 def test_optional_flag(tmp_path: Any) -> None:
     linter_yaml = tmp_path / "linter.yaml"
@@ -45,7 +45,7 @@ def test_optional_flag(tmp_path: Any) -> None:
     
     assert engine.total_errors == 0
     assert engine.total_warnings == 1
-    assert "Kein Match für 'missing_but_optional.md'" in engine.results_tree["root"]["_warnings"][0]
+    assert "Kein Match für 'missing_but_optional.md'" in engine.results_tree["root"]["_warnings"][0]['msg']
 
 def test_silent_flag(tmp_path: Any) -> None:
     linter_yaml = tmp_path / "linter.yaml"
@@ -179,7 +179,7 @@ def test_run_templates_match_failure(tmp_path: Any) -> None:
         instance.trace_log = ["trace1"]
         engine._run_templates(files_data)
         assert engine.total_errors == 2
-        assert "error1" in engine.results_tree["file.md"]["_errors"]
+        assert any("error1" in e['msg'] for e in engine.results_tree["file.md"]["_errors"])
 
 def test_run_phase(tmp_path: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
@@ -219,7 +219,8 @@ def test_execute_rule_success_and_crash() -> None:
     with patch('os.makedirs'):
         with patch('builtins.open', mock_open()):
             engine._execute_rule(dummy_rule, "dummy_rule", node, f_data)
-    assert engine.total_errors == 2  # the results are added as errors by default in execute_rule if returned
+    assert engine.total_errors == 2
+    assert any("warning 1" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
     
     # Test crash
     def crash_rule() -> None:
@@ -227,6 +228,7 @@ def test_execute_rule_success_and_crash() -> None:
         
     engine._execute_rule(crash_rule, "crash_rule", node, f_data)
     assert engine.total_errors == 3
+    assert any("Crash 'crash_rule': boom" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
 
 def test_run_global_phase() -> None:
     engine = LinterEngine(registry, models_module="test_models")
@@ -239,11 +241,13 @@ def test_run_global_phase() -> None:
     engine.registry.bindings = [mock_binding]
     engine._run_global_phase(3)
     assert engine.total_warnings == 1
+    assert any("global warn" in w['msg'] for w in engine.results_tree['root']['_warnings'])
     
     # Test crash
     mock_binding.func.side_effect = ValueError("boom")
     engine._run_global_phase(3)
     assert engine.total_errors == 1
+    assert any("Global Crash 'global_rule': boom" in e['msg'] for e in engine.results_tree['root']['_errors'])
 
 def test_print_report(capsys: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
@@ -254,8 +258,9 @@ def test_print_report(capsys: Any) -> None:
     assert "PERFECT REPOSITORY" in captured.out
     
     # with errors
-    engine._add_results("ERROR", "file1.md", ["error 1"])
-    engine._add_results("WARNING", "dir1/file2.md", ["warn 1"])
+    origin = {'method': 'm', 'module': 'mod', 'file': 'f.py', 'doc': 'd'}
+    engine._add_results("ERROR", "file1.md", ["error 1"], origin=origin)
+    engine._add_results("WARNING", "dir1/file2.md", ["warn 1"], origin=origin)
     has_errors = engine.print_report()
     assert has_errors
     captured = capsys.readouterr()
@@ -264,6 +269,8 @@ def test_print_report(capsys: Any) -> None:
     assert "dir1/" in captured.out
     assert "error 1" in captured.out
     assert "warn 1" in captured.out
+    assert "[Processor: m (mod)]" in captured.out
+
 
 def test_walk_and_validate_permission_error(tmp_path: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
