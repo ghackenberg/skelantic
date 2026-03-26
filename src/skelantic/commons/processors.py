@@ -45,7 +45,8 @@ def build_document_graph(node: MarkdownNode, state: GlobalMetadataState, tracer:
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return
 
-    abs_filepath = node.abs_path.as_posix()
+    # Nutze voll aufgelöste Pfade für Konsistenz
+    abs_filepath = node.abs_path.resolve().as_posix()
 
     if rel_path != "README.md":
         state.all_markdown_files.add(abs_filepath)
@@ -55,8 +56,8 @@ def build_document_graph(node: MarkdownNode, state: GlobalMetadataState, tracer:
     for link in links:
         link_path = link.split('#')[0]
         if not link_path: continue
-        target_abs_path = (node.abs_path.parent / link_path).resolve()
-        state.referenced_markdown_files.add(target_abs_path.as_posix())
+        target_abs_path = (node.abs_path.parent / link_path).resolve().as_posix()
+        state.referenced_markdown_files.add(target_abs_path)
 
 @processor(match="root", phase=3)
 def check_orphaned_documents(state: GlobalMetadataState, tracer: Callable[[str], None]) -> List[str]:
@@ -71,7 +72,7 @@ def check_orphaned_documents(state: GlobalMetadataState, tracer: Callable[[str],
             pretty_path = os.path.relpath(orphan, os.getcwd()).replace('\\', '/')
             tracer(f"Verwaiste Datei gefunden: {pretty_path}")
             warnings.append(f"Verwaistes Dokument: Die Datei '{pretty_path}' wird nirgendwo im Repository referenziert. Bitte füge einen Link zu dieser Datei hinzu (z.B. in der README.md des Ordners) oder lösche sie, falls sie obsolet ist.")
-        except: pass
+        except Exception: pass
 
     return warnings
 

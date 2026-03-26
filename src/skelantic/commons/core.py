@@ -99,7 +99,7 @@ class LinterEngine:
         return doc
 
     def _run_phase(self, phase: int, files_data: List[Dict[str, Any]]) -> None:
-        from .nodes import FileNode, DirectoryNode
+        from .nodes import FileNode, DirectoryNode, MarkdownNode
         for f_data in files_data:
             rp = f_data['rel_path']
             # Find matching class in node_map
@@ -116,7 +116,10 @@ class LinterEngine:
                             NodeClass = cls
             
             if NodeClass is None:
-                NodeClass = DirectoryNode if f_data.get('is_directory', False) else FileNode
+                if f_data.get('is_directory', False):
+                    NodeClass = DirectoryNode
+                else:
+                    NodeClass = MarkdownNode if rp.endswith('.md') else FileNode
 
             node = NodeClass(f_data['abs_path'], rp, self.ctx)
             if not f_data.get('is_directory', False):
