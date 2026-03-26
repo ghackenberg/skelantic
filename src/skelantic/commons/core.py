@@ -99,7 +99,7 @@ class LinterEngine:
         return doc
 
     def _run_phase(self, phase: int, files_data: List[Dict[str, Any]]) -> None:
-        from .nodes import FSNode, FileNode, DirectoryNode
+        from .nodes import FileNode, DirectoryNode
         for f_data in files_data:
             rp = f_data['rel_path']
             # Find matching class in node_map
@@ -258,38 +258,38 @@ class LinterEngine:
             prefix = "   " * indent
         
         # Gruppierung der Warnungen nach Prozessor
-        warn_groups = defaultdict(list)
-        for w in node.get('_warnings', []):
-            origin_key = f"{w['origin']['module']}:{w['origin']['method']}" if isinstance(w, dict) and w.get('origin') else "system"
+        warn_groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for w in cast(List[Dict[str, Any]], node.get('_warnings', [])):
+            origin = cast(Optional[Dict[str, Any]], w.get('origin'))
+            origin_key = f"{origin['module']}:{origin['method']}" if origin else "system"
             warn_groups[origin_key].append(w)
             
         for origin_key, items in warn_groups.items():
             if origin_key != "system":
-                o = items[0]['origin']
+                o = cast(Dict[str, Any], items[0]['origin'])
                 print(f"{prefix}⚙️ {o['module']}:{o['method']}")
                 for item in items:
                     print(f"{prefix}   ⚠️ {item['msg']}")
             else:
                 for item in items:
-                    msg = item['msg'] if isinstance(item, dict) else item
-                    print(f"{prefix}⚠️ {msg}")
+                    print(f"{prefix}⚠️ {item['msg']}")
 
         # Gruppierung der Fehler nach Prozessor
-        err_groups = defaultdict(list)
-        for e in node.get('_errors', []):
-            origin_key = f"{e['origin']['module']}:{e['origin']['method']}" if isinstance(e, dict) and e.get('origin') else "system"
+        err_groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for e in cast(List[Dict[str, Any]], node.get('_errors', [])):
+            origin = cast(Optional[Dict[str, Any]], e.get('origin'))
+            origin_key = f"{origin['module']}:{origin['method']}" if origin else "system"
             err_groups[origin_key].append(e)
             
         for origin_key, items in err_groups.items():
             if origin_key != "system":
-                o = items[0]['origin']
+                o = cast(Dict[str, Any], items[0]['origin'])
                 print(f"{prefix}⚙️ {o['module']}:{o['method']}")
                 for item in items:
                     print(f"{prefix}   ❌ {item['msg']}")
             else:
                 for item in items:
-                    msg = item['msg'] if isinstance(item, dict) else item
-                    print(f"{prefix}❌ {msg}")
+                    print(f"{prefix}❌ {item['msg']}")
 
         for child_name, child_node in sorted(node.items()):
             if child_name not in ['_errors', '_warnings']: self._print_node(child_name, child_node, indent)

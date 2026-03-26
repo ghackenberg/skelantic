@@ -8,9 +8,9 @@ import pathlib
 import shutil
 import yaml
 import inspect
-from typing import Dict, cast
+from typing import Dict, List, cast
 from skelantic.commons.core import LinterEngine
-from skelantic.commons.decorators import registry
+from skelantic.commons.decorators import registry, ProcessorBinding
 from skelantic.commons.resolver import PathResolver
 
 def _get_versions() -> tuple[str, str]:
@@ -225,21 +225,28 @@ def main() -> None:
         print("-" * 50)
         
         # Group by phase for better overview
-        by_phase = {1: [], 2: [], 3: []}
+        by_phase: Dict[int, List[ProcessorBinding]] = {1: [], 2: [], 3: []}
         for b in registry.bindings:
-            by_phase[b.phase or 2].append(b)
+            phase = b.phase if b.phase is not None else 2
+            if phase not in by_phase:
+                by_phase[phase] = []
+            by_phase[phase].append(b)
             
-        for phase in [1, 2, 3]:
+        all_phases = sorted(by_phase.keys())
+        for phase in all_phases:
             if not by_phase[phase]: continue
             print(f"\n[PHASE {phase}]")
             for b in sorted(by_phase[phase], key=lambda x: f"{x.func.__module__}.{x.func.__name__}"):
+                func_name = b.func.__name__
+                func_module = b.func.__module__
                 try:
                     f_file = inspect.getfile(b.func)
                     f_file = os.path.relpath(f_file, os.getcwd()).replace('\\', '/')
-                except: f_file = "Unknown"
+                except Exception:
+                    f_file = "Unknown"
                 
-                doc = (b.func.__doc__ or "No docstring.").strip().split('\n')[0]
-                print(f"⚙️ {b.func.__module__}:{b.func.__name__}")
+                doc = (getattr(b.func, "__doc__", "") or "No docstring.").strip().split('\n')[0]
+                print(f"⚙️ {func_module}:{func_name}")
                 print(f"   Match: {b.match or 'Type-based only'}")
                 print(f"   File:  {f_file}")
                 print(f"   Doc:   \"{doc}\"")
@@ -281,28 +288,30 @@ def main() -> None:
             sys.exit(1)
             
         if args.command == "info":
+            match_path: str = res.match_path or "N/A"
+            parent_folder: str = res.parent_folder or "N/A"
             print(f"Path:   {args.path.replace('\\', '/')}")
             print(f"Status: {'✅ MATCHED' if res.exists else '👻 SCHEMA MATCH (File does not exist yet)'}")
             print("-" * 50)
             print("--- Configuration State ---")
-            print(f"Full Match Path:    {res.match_path.replace('\\', '/')}")
-            print(f"Parent Folder Path: {res.parent_folder.replace('\\', '/')}")
+            print(f"Full Match Path:    {match_path.replace('\\', '/')}")
+            print(f"Parent Folder Path: {parent_folder.replace('\\', '/')}")
             print(f"Description:        {res.config.get('description', 'N/A')}")
             print(f"Ignore:             {res.config.get('ignore', False)}")
             print(f"Optional:           {res.config.get('optional', False)}")
             print(f"Silent:             {res.config.get('silent', False)}")
             
-            t_file_rel = "None"
+            t_file_rel: str = "None"
             if res.template_path:
                 try: t_file_rel = os.path.relpath(res.template_path, os.getcwd()).replace('\\', '/')
-                except: t_file_rel = res.template_path.replace('\\', '/')
+                except Exception: t_file_rel = res.template_path.replace('\\', '/')
             print(f"Template File:      {t_file_rel}")
             
             print("\n--- Python Injection Interface ---")
             print(f"Node Type:   {res.node_type or 'N/A'}")
             print(f"Parent Type: {res.parent_type or 'N/A'}")
             print("\nPath Variables (node.path_params):")
-            for k, v in res.path_params.items():
+            for k, v in res.path_variables.items():
                 print(f"  {k}: {v}")
             
             # Extract template fields if exists

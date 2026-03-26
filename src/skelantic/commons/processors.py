@@ -1,9 +1,9 @@
 import re
 import os
-from typing import List, Set, cast, Callable
+from typing import List, Set, Callable
 from pydantic import BaseModel, Field
 from .decorators import processor
-from .nodes import FileNode, MarkdownNode
+from .nodes import MarkdownNode
 
 # --- GLOBAL STATE ---
 
@@ -89,12 +89,13 @@ def backlink_enforcement(node: MarkdownNode, tracer: Callable[[str], None]) -> L
         return []
 
     # Bestimme das Startverzeichnis für die Suche nach einer README.md
+    search_dir: str = "."
     if filename == "README.md":
         # Wenn wir selbst eine README sind, suchen wir im ELTERN-Ordner
-        search_dir = os.path.dirname(os.path.dirname(rel_path))
+        search_dir = os.path.dirname(os.path.dirname(rel_path)) or "."
     else:
         # Wenn wir eine normale Datei sind, suchen wir im EIGENEN Ordner oder höher
-        search_dir = os.path.dirname(rel_path)
+        search_dir = os.path.dirname(rel_path) or "."
 
     target_rel_path = None
     target_repo_path = None
