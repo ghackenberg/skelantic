@@ -3,7 +3,7 @@ import os
 from typing import List, Set, Callable
 from pydantic import BaseModel, Field
 from .decorators import processor
-from .nodes import FSNode, MarkdownNode, RootNode
+from .nodes import MarkdownNode, RootNode
 
 # --- GLOBAL STATE ---
 

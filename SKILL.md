@@ -1,6 +1,6 @@
 ---
 name: skelantic
-description: "Skelantic strictly governs this repository's architecture. CRITICAL RULES: 1. You MUST run `skelantic verify` after every modification to ensure architectural, type, and logic integrity. 2. NEVER create files or directories that are not explicitly allowed in a `.skelantic/config.yaml`. 3. If any step in verify fails, run the specific command with `-v` (e.g., `skelantic run -v`) for detailed traces. Activate this skill for detailed instructions."
+description: "Skelantic strictly governs this repository's architecture. CRITICAL RULES: 1. You MUST run `skelantic verify` after every modification to ensure architectural, type, and logic integrity. 2. NEVER create files or directories that are not explicitly allowed in a `.skelantic/config.yaml`. 3. If any step in verify fails, follow the 'Recommended action' provided by the CLI. Activate this skill for detailed instructions."
 ---
 
 # 🛡️ Skelantic Agent Skill
@@ -42,8 +42,8 @@ This command performs four critical steps:
 4. **Run**: Validates the actual repository structure.
 
 **If any step fails:**
-- Run the specific command with `-v` (e.g., `skelantic run -v`) to see detailed traces.
-- Fix all reported errors before considering the task complete.
+- Read the error message carefully. `skelantic verify` will suggest a **recommended action** (e.g., running a sub-command with `-v` for more details).
+- Follow the recommended action to diagnose and fix all reported errors.
 - NEVER ignore Pyright errors or low test coverage.
 
 ## 📚 Detailed Documentation

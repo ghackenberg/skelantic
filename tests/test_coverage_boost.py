@@ -4,6 +4,7 @@ import yaml
 import pathlib
 import pytest
 import importlib
+import subprocess
 from unittest.mock import patch, MagicMock, mock_open
 from skelantic.cli import main, _load_settings, _check_version, _get_versions
 from skelantic.commons.core import LinterEngine
@@ -139,6 +140,29 @@ def test_cli_processors_with_registry(tmp_path, monkeypatch, capsys):
             assert "[PHASE 2]" in out
             assert "my_test_proc" in out
             assert "Test Docstring" in out
+
+def test_cli_verify_failure_reporting(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    
+    with patch('importlib.metadata.version', return_value='0.2.0'), \
+         patch('subprocess.run') as mock_run:
+        # Mock failure at step 'run'
+        mock_run.side_effect = [
+            MagicMock(returncode=0), # generate
+            MagicMock(returncode=0), # right
+            MagicMock(returncode=0), # test
+            subprocess.CalledProcessError(1, ["skelantic", "run"]) # run fails
+        ]
+        
+        monkeypatch.setattr(sys, 'argv', ['skelantic', 'verify'])
+        with pytest.raises(SystemExit):
+            main()
+        
+        out = capsys.readouterr().out
+        assert "Verification failed at step 'run'" in out
+        assert "Recommended action: Run 'skelantic run -v'" in out
 
 def test_load_settings_corrupt(tmp_path):
     s_file = tmp_path / ".skelantic/settings.yaml"

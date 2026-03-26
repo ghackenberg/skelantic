@@ -9,7 +9,7 @@ import shutil
 import yaml
 import inspect
 import subprocess
-from typing import Dict, List, cast, Optional
+from typing import Dict, List, cast, Optional, Any
 from skelantic.commons.core import LinterEngine
 from skelantic.commons.decorators import registry, ProcessorBinding
 from skelantic.commons.resolver import PathResolver
@@ -218,20 +218,31 @@ def main() -> None:
         elif args.command == "verify":
             print("🚀 Starting full verification pipeline...")
             
-            print("\nStep 1/4: Generating types...")
-            subprocess.run([sys.executable, "-m", "skelantic", "generate"], check=True)
-            
-            print("\nStep 2/4: Checking types...")
-            subprocess.run([sys.executable, "-m", "skelantic", "right"], check=True)
-            
-            print("\nStep 3/4: Running tests...")
-            subprocess.run([sys.executable, "-m", "skelantic", "test"], check=True)
-            
-            print("\nStep 4/4: Validating repository...")
-            subprocess.run([sys.executable, "-m", "skelantic", "run"], check=True)
-            
-            print("\n✨ ALL CHECKS PASSED: Repository is 100% compliant and tested.")
-            return
+            try:
+                print("\nStep 1/4: Generating types...")
+                subprocess.run([sys.executable, "-m", "skelantic", "generate"], check=True)
+                
+                print("\nStep 2/4: Checking types...")
+                subprocess.run([sys.executable, "-m", "skelantic", "right"], check=True)
+                
+                print("\nStep 3/4: Running tests...")
+                subprocess.run([sys.executable, "-m", "skelantic", "test"], check=True)
+                
+                print("\nStep 4/4: Validating repository...")
+                subprocess.run([sys.executable, "-m", "skelantic", "run"], check=True)
+                
+                print("\n✨ ALL CHECKS PASSED: Repository is 100% compliant and tested.")
+                return
+            except subprocess.CalledProcessError as e:
+                # Identify which step failed based on the command executed
+                cmd_args = cast(List[Any], e.cmd)
+                failed_step: str = str(cmd_args[-1])
+                print(f"\n❌ Verification failed at step '{failed_step}'.")
+                if failed_step in ["run", "generate"]:
+                    print(f"👉 Recommended action: Run 'skelantic {failed_step} -v' to see detailed logs.")
+                else:
+                    print(f"👉 Recommended action: Fix the reported errors in the step above and try again.")
+                sys.exit(1)
 
         elif args.command == "init":
             # 1. Structure

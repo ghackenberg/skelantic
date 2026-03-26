@@ -143,6 +143,15 @@ skelantic template <path>
 
 ---
 
+## 🛡️ Workflow Nudges & Failure Handling
+
+Skelantic is designed to guide you through a high-quality development process.
+
+*   **Next Steps**: After most successful commands, the CLI will suggest the **next recommended step** (e.g., after `generate`, it suggests `right`).
+*   **Intelligent Failure**: If `skelantic verify` fails, it identifies the exact step that caused the issue and provides a **Recommended action** (e.g., repeating a failing `run` command with `-v` to see detailed traces).
+
+---
+
 ## 🛡️ Version Checking
 
 Skelantic automatically checks for version mismatches.
