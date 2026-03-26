@@ -181,11 +181,11 @@ class CodeGenerator:
         return out
 
     def generate_repo_graph(self, config: Dict[str, Any]) -> str:
-        self.node_map["root"] = "RepoGraph"
-        
+        self.node_map["."] = "RepoGraph"
+
         def render_node(node_config: Dict[str, Any], path_parts: List[str], class_name: str, parent_class_path: str, is_dir: bool, indent_level: int) -> str:
             indent = "    " * indent_level
-            
+
             # Determine base class
             if not is_dir:
                 original_name = path_parts[-1] if path_parts else ""
@@ -195,14 +195,13 @@ class CodeGenerator:
                     base_class = "FileNode"
             else:
                 base_class = "DirectoryNode"
-                
+
             out = f"{indent}class {class_name}({base_class}):\n"
             inner_indent = indent + "    "
-            
+
             current_full_class_path = f"{parent_class_path}.{class_name}" if parent_class_path else class_name
-            current_config_path = "/".join(path_parts) if path_parts else "root"
+            current_config_path = "/".join(path_parts) if path_parts else "."
             self.node_map[current_config_path] = current_full_class_path
-            
             has_content = False
             
             # 1. Parent Node Navigation

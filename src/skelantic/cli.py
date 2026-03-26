@@ -417,7 +417,7 @@ def main() -> None:
                                 # Resolve actual node class
                                 node_cls = None
                                 if res.match_path in node_map: node_cls = node_map[res.match_path]
-                                elif args.path == "." and "root" in node_map: node_cls = node_map["root"]
+                                elif args.path == "." and "." in node_map: node_cls = node_map["."]
                                 
                                 if node_cls:
                                     target_anno = first_param.annotation
