@@ -57,7 +57,9 @@ The Skelantic `@processor` decorator uses Python's `inspect` module to dynamical
 
 You can request any combination of the following parameters:
 * `node: <Your RepoGraph Class>`: The file or directory currently being inspected. Gives you typsafe access to `node.rel_path`, `node.parent_node`, `node.root_node`, `node.path_params`, and `node.data`.
-* `tracer: Callable[[str], None]`: A function you must call to write debug logs. If your processor returns an error, these traces will be saved to `.skelantic/traces/` to help the user debug. If you run `skelantic run -v`, these traces are printed in real-time.
+* `tracer: Callable[[str], None]`: A function you must call to write debug logs. Skelantic automatically saves these traces to `.skelantic/traces/` (even if the processor crashes).
+* **Analyse-Hilfe**: If a processor generates traces, Skelantic adds an `INFO` hint (💡) to the final report pointing to the log file. In verbose mode (`-v`), these hints are shown for all processors; otherwise, they only appear for processors that reported errors.
+
 
 ### Injecting Global State
 
