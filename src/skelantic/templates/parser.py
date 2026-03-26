@@ -28,7 +28,7 @@ def get_regex_for_type(type_str: str) -> str:
     bounded_match = re.match(r'^(digit|char)(?:\(([0-9,]+)\))?$', type_str)
     if bounded_match:
         base_type, var_args = bounded_match.groups()
-        char_regex = r"[a-zA-Z0-9]"
+        char_regex = r"[a-zA-Z0-9_-]"
         min_len, max_len = "1", "1"
         if var_args:
             if ',' in var_args:

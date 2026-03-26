@@ -43,8 +43,10 @@ def validate_issue_status(node: RepoGraph.Docs.Issues.SlugMd) -> List[str]:
 
 The Skelantic `@processor` decorator uses Python's `inspect` module to dynamically inject exactly what your function needs based on its signature.
 
+**Mandatory Docstrings:** Every processor function MUST have a Python docstring. This is used by `skelantic info` to describe the validation logic to agents and humans.
+
 You can request any combination of the following parameters:
-* `node: <Your RepoGraph Class>`: The file or directory currently being inspected. Gives you typsafe access to `node.rel_path`, `node.parent_node`, `node.path_params`, and `node.data`.
+* `node: <Your RepoGraph Class>`: The file or directory currently being inspected. Gives you typsafe access to `node.rel_path`, `node.parent_node`, `node.root_node`, `node.path_params`, and `node.data`.
 * `tracer: Callable[[str], None]`: A function you can call to write debug logs. If your processor returns an error, these traces will be saved to `.skelantic/traces/` to help the user debug.
 
 ### Injecting Global State

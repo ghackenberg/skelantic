@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from .documents import Document, MarkdownDocument
 from .context import LinterContext
 
@@ -43,6 +43,12 @@ class FSNode:
         if isinstance(node, DirectoryNode):
             return node
         return None
+
+    @property
+    def root_node(self) -> 'DirectoryNode':
+        """Gibt den Wurzelknoten des Repositories zurück."""
+        node = self._ctx.get_node(".")
+        return cast(DirectoryNode, node)
 
 class DirectoryNode(FSNode):
     """Repräsentiert einen geprüften Ordner."""
@@ -93,6 +99,11 @@ class FileNode(FSNode):
             self.document = MarkdownDocument(abs_path)
         else:
             self.document = Document(abs_path)
+
+    @property
+    def raw_content(self) -> str:
+        """Gibt den rohen Textinhalt der Datei zurück (Proxy für node.document.raw_content)."""
+        return self.document.raw_content
 
 class MarkdownNode(FileNode):
     """Repräsentiert eine geprüfte Markdown-Datei."""

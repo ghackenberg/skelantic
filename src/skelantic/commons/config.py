@@ -100,7 +100,7 @@ def get_regex(pattern: str) -> Pattern[str]:
     escaped = re.escape(pattern)
     def repl(match: Match[str]) -> str:
         var_name, var_type, var_args = match.groups()
-        char_regex = r"[a-zA-Z0-9]"
+        char_regex = r"[a-zA-Z0-9_-]"
         
         # Default lengths
         min_len, max_len = "1", "1"

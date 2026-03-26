@@ -46,8 +46,12 @@ The relative path of the item from the root of the repository (the folder where 
 Returns the strongly typed `DirectoryNode` (or its specific generated subclass) that contains this node. Useful for navigating "up" the repository tree.
 *Example:* `parent = node.parent_node`
 
+### `node.root_node` (RepoGraph)
+Returns the root node of the entire repository. This is always an instance of the generated `RepoGraph` class.
+*Example:* `root = node.root_node`
+
 ### `node.path_params` (BaseModel)
-If the configuration for this node included variables in the path (e.g., `{slug}.md`), this property holds a strictly typed Pydantic model containing those extracted variables. If no variables were defined, this property may not exist.
+If the configuration for this node included variables in the path (e.g., `{slug:char(1,)}.md`), this property holds a strictly typed Pydantic model containing those extracted variables. If no variables were defined, this property may not exist.
 *Example:* `slug = node.path_params.slug`
 
 ### `node.data` (Any)
@@ -79,6 +83,7 @@ content = node.document.raw_content
 if "TODO" in content:
     return ["File contains unresolved TODOs."]
 ```
+*(Note: `node.raw_content` is also available as a shorthand proxy for this).*
 
 #### Markdown Helpers
 If the file ends with `.md`, `node.document` is automatically instantiated as a `MarkdownDocument`. This provides additional helper methods:
