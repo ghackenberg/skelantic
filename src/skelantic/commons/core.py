@@ -161,39 +161,45 @@ class LinterEngine:
                 if binding.phase != phase:
                     continue
                 
-                # Global rules are run separately in _run_global_phase
+                # Global rules (match="root") are run separately in _run_global_phase
                 if binding.match == "root":
                     continue
+
+                sig = inspect.signature(binding.func)
+                params = list(sig.parameters.values())
+                node_param = next((p for p in params if p.name == 'node'), None)
 
                 # 1. Regex Match (if provided)
                 if binding.regex:
                     if not binding.regex.match(rp):
                         continue
+                elif not node_param:
+                    # No regex AND no node param -> This is a pure global processor.
+                    # We skip it here, it will run in _run_global_phase.
+                    continue
                 
-                # 2. Type Hint Match (if provided)
-                sig = inspect.signature(binding.func)
-                params = list(sig.parameters.values())
-                
-                # Check if 'node' parameter exists and if its type matches
-                node_param = next((p for p in params if p.name == 'node'), None)
+                # 2. Type Hint Match (if 'node' parameter is present)
                 if node_param and node_param.annotation != inspect.Parameter.empty:
                     anno = node_param.annotation
                     # Handle forward references
                     if isinstance(anno, str) and self.types_module:
                         try:
-                            # Use types_module's dict for evaluation
                             type_env = cast(Dict[str, Any], vars(self.types_module))
                             anno = eval(anno, type_env)
                         except Exception: pass
                     
                     try:
-                        # Only check if it's actually a type/tuple/Union
+                        # Robust check for types and Union types
                         if not isinstance(anno, str):
                             if not isinstance(node, anno):
                                 continue
+                        else:
+                            # If eval failed and it's still a string, we can't reliably match
+                            continue
                     except TypeError:
-                        # Fallback for complex typing constructs
-                        pass
+                        # Complex typing construct that doesn't support isinstance
+                        # We skip to be safe
+                        continue
                         
                 self._execute_rule(binding.func, binding.name, node, f_data)
 
@@ -233,7 +239,7 @@ class LinterEngine:
                 'method': func.__name__,
                 'module': func.__module__,
                 'file': os.path.relpath(inspect.getfile(func), os.getcwd()).replace('\\', '/'),
-                'doc': (func.__doc__ or "").strip().split('\n')[0]
+                'doc': (getattr(func, "__doc__", "") or "").strip().split('\n')[0]
             }
         except Exception: pass
 
@@ -262,11 +268,36 @@ class LinterEngine:
         for binding in self.registry.bindings:
             if binding.phase != phase:
                 continue
-            if binding.match != "root" and binding.match is not None:
+            
+            is_explicit_root = (binding.match == "root")
+            
+            # Check if it's a pure global processor (no node, no regex)
+            sig = inspect.signature(binding.func)
+            params = list(sig.parameters.values())
+            node_param = next((p for p in params if p.name == 'node'), None)
+            is_pure_global = (not node_param and not binding.regex and binding.match is None)
+            
+            if not is_explicit_root and not is_pure_global:
                 continue
             
             # For global phase, the node is the root node (.)
             root_node = self.ctx.get_node(".")
+            
+            # Check type matching for explicit root nodes
+            if is_explicit_root and node_param and node_param.annotation != inspect.Parameter.empty:
+                anno = node_param.annotation
+                if isinstance(anno, str) and self.types_module:
+                    try:
+                        type_env = cast(Dict[str, Any], vars(self.types_module))
+                        anno = eval(anno, type_env)
+                    except Exception: pass
+                
+                try:
+                    if not isinstance(anno, str) and not isinstance(root_node, anno):
+                        continue
+                except TypeError:
+                    continue
+
             self._execute_rule(binding.func, binding.name, root_node, None)
 
     def _add_results(self, severity: str, full_rel_path: str, results: List[str], origin: Optional[Dict[str, Any]] = None) -> None:
