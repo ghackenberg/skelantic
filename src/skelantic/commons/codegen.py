@@ -212,6 +212,15 @@ class CodeGenerator:
                 out += f"{inner_indent}    return cast({parent_class_path}, super().parent_node)\n\n"
                 has_content = True
 
+            # Root Node Navigation
+            out += f"{inner_indent}@property\n"
+            out += f"{inner_indent}def root_node(self) -> RepoGraph:\n"
+            if class_name == "RepoGraph":
+                out += f"{inner_indent}    return self\n\n"
+            else:
+                out += f"{inner_indent}    return cast(RepoGraph, super().root_node)\n\n"
+            has_content = True
+
             # 2. Path Params
             last_part = path_parts[-1] if path_parts else ""
             if last_part:

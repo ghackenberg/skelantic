@@ -250,6 +250,19 @@ class LinterEngine:
     def _walk_and_validate(self, current_dir: str, current_config: Dict[str, Any], all_files_out: List[Dict[str, Any]], rel_path: str = ".", ignore_patterns: Optional[List[Pattern[str]]] = None, inherited_kwargs: Optional[Dict[str, Any]] = None) -> None:
         inherited_kwargs = inherited_kwargs or {}
         ignore_patterns = list(ignore_patterns) if ignore_patterns else []
+        
+        if rel_path == ".":
+            # Add root directory node explicitly
+            all_files_out.append({
+                'abs_path': os.path.abspath(current_dir),
+                'rel_path': ".",
+                'filename': os.path.basename(os.path.abspath(current_dir)),
+                'is_directory': True,
+                'kwargs': {},
+                'template': None,
+                'base_dir': "."
+            })
+
         try: entries = os.listdir(current_dir)
         except PermissionError: return
         hard_ignore = {".git", "node_modules", "venv", "__pycache__", ".skelantic", ".pytest_cache", ".mypy_cache", "linter.yaml", ".coverage"}

@@ -269,7 +269,8 @@ def test_walk_and_validate_permission_error(tmp_path: Any) -> None:
     with patch('os.listdir', side_effect=PermissionError):
         all_files: List[Any] = []
         engine._walk_and_validate(str(tmp_path), {}, all_files)
-        assert len(all_files) == 0
+        # Root node is now added before listdir
+        assert len(all_files) == 1
 
 def test_walk_and_validate_local_config(tmp_path: Any) -> None:
     linter_dir = tmp_path / ".skelantic"
