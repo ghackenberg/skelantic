@@ -27,9 +27,17 @@ class LinterContext:
         """Holt einen Knoten anhand seines relativen Pfades."""
         # Sicherstellen, dass der Pfad saubere Slashes verwendet
         clean_path = rel_path.replace('\\', '/')
-        # Falls der Pfad mit ./ oder / anfängt, bereinigen
+        
+        # Falls der Pfad mit ./ anfängt, bereinigen
         if clean_path.startswith('./'):
             clean_path = clean_path[2:]
+            
+        # Absolute Pfade am Anfang bereinigen
         if clean_path.startswith('/'):
             clean_path = clean_path[1:]
+            
+        # Leere Pfade oder . auf . normalisieren
+        if clean_path in ["", "."]:
+            clean_path = "."
+            
         return self.nodes_registry.get(clean_path)

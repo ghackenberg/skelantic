@@ -160,6 +160,10 @@ class LinterEngine:
             for binding in self.registry.bindings:
                 if binding.phase != phase:
                     continue
+                
+                # Global rules are run separately in _run_global_phase
+                if binding.match == "root":
+                    continue
 
                 # 1. Regex Match (if provided)
                 if binding.regex:
@@ -169,13 +173,27 @@ class LinterEngine:
                 # 2. Type Hint Match (if provided)
                 sig = inspect.signature(binding.func)
                 params = list(sig.parameters.values())
-                if params:
-                    first_param = params[0]
-                    if first_param.annotation != inspect.Parameter.empty:
-                        # Allow injection of node, but only if type matches
-                        if first_param.name == 'node':
-                            if not isinstance(node, first_param.annotation):
+                
+                # Check if 'node' parameter exists and if its type matches
+                node_param = next((p for p in params if p.name == 'node'), None)
+                if node_param and node_param.annotation != inspect.Parameter.empty:
+                    anno = node_param.annotation
+                    # Handle forward references
+                    if isinstance(anno, str) and self.types_module:
+                        try:
+                            # Use types_module's dict for evaluation
+                            type_env = cast(Dict[str, Any], vars(self.types_module))
+                            anno = eval(anno, type_env)
+                        except Exception: pass
+                    
+                    try:
+                        # Only check if it's actually a type/tuple/Union
+                        if not isinstance(anno, str):
+                            if not isinstance(node, anno):
                                 continue
+                    except TypeError:
+                        # Fallback for complex typing constructs
+                        pass
                         
                 self._execute_rule(binding.func, binding.name, node, f_data)
 
@@ -190,12 +208,21 @@ class LinterEngine:
             if self.verbose: print(f"   [TRACE] {msg}")
 
         for param_name, param in sig.parameters.items():
-            if hasattr(param.annotation, '__mro__') and issubclass(param.annotation, BaseModel):
-                state_cls = param.annotation
+            anno = param.annotation
+            # Handle forward references
+            if isinstance(anno, str) and self.types_module:
+                try: 
+                    type_env = cast(Dict[str, Any], vars(self.types_module))
+                    anno = eval(anno, type_env)
+                except Exception: pass
+
+            if not isinstance(anno, str) and hasattr(anno, '__mro__') and issubclass(anno, BaseModel):
+                state_cls = anno
                 if state_cls not in self._state_singletons:
                     self._state_singletons[state_cls] = state_cls()
                 kwargs[param_name] = self._state_singletons[state_cls]
-            elif param_name == 'node': kwargs['node'] = node
+            elif param_name == 'node': 
+                kwargs['node'] = node
             elif param_name == 'tracer': kwargs['tracer'] = tracer
             else:
                 self._log(f"Warning: Argument '{param_name}' requested by processor '{rule_name}' cannot be injected. Only 'node', 'tracer', and Pydantic state models are supported.", level="WARNING")
@@ -208,7 +235,7 @@ class LinterEngine:
                 'file': os.path.relpath(inspect.getfile(func), os.getcwd()).replace('\\', '/'),
                 'doc': (func.__doc__ or "").strip().split('\n')[0]
             }
-        except: pass
+        except Exception: pass
 
         try:
             res = func(**kwargs)
@@ -222,7 +249,7 @@ class LinterEngine:
                         with open(trace_file, "w", encoding="utf-8") as f:
                             f.write("\n".join(current_traces))
                         res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
-                    self._add_results("ERROR", f_data['rel_path'], res, origin=origin)
+                    self._add_results("ERROR", f_data['rel_path'] if f_data else "root", res, origin=origin)
                 else:
                     self._add_results("WARNING", "root", res, origin=origin)
             return res or []
@@ -237,8 +264,10 @@ class LinterEngine:
                 continue
             if binding.match != "root" and binding.match is not None:
                 continue
-                
-            self._execute_rule(binding.func, binding.name, None, None)
+            
+            # For global phase, the node is the root node (.)
+            root_node = self.ctx.get_node(".")
+            self._execute_rule(binding.func, binding.name, root_node, None)
 
     def _add_results(self, severity: str, full_rel_path: str, results: List[str], origin: Optional[Dict[str, Any]] = None) -> None:
         if not results: return
