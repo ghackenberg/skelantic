@@ -16,7 +16,7 @@ class GlobalMetadataState(BaseModel):
 
 @processor(match="**/*.md", phase=2)
 def dead_link(node: MarkdownNode) -> List[str]:
-    """Checks for broken relative links in markdown files."""
+    """Prüft auf tote relative Links in Markdown-Dateien."""
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return []
@@ -31,13 +31,13 @@ def dead_link(node: MarkdownNode) -> List[str]:
         target_abs_path = (node.abs_path.parent / link_path).resolve()
         
         if not target_abs_path.exists():
-            errors.append(f"Dead Link: Verweist auf '{link}', aber Ziel existiert nicht!")
+            errors.append(f"Toter Link: Der Verweis auf '{link}' kann nicht aufgelöst werden, da das Ziel nicht existiert. Bitte korrigiere den Pfad oder erstelle die fehlende Datei.")
 
     return errors
 
 @processor(match="**/*.md", phase=1)
 def build_document_graph(node: MarkdownNode, state: GlobalMetadataState) -> None:
-    """Phase 1: Sammelt alle Markdown-Dateien und alle Referenzen (Links) im gesamten Repo."""
+    """Indexiert alle Markdown-Dateien und deren Verknüpfungen für die globale Konsistenzprüfung."""
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return
@@ -57,7 +57,7 @@ def build_document_graph(node: MarkdownNode, state: GlobalMetadataState) -> None
 
 @processor(match="root", phase=3)
 def check_orphaned_documents(state: GlobalMetadataState) -> List[str]:
-    """Phase 3: Prüft, ob es gibt Dateien gibt, die nie referenziert wurden."""
+    """Identifiziert Dateien, die im Repository existieren, aber von keiner anderen Datei verlinkt werden."""
     warnings: List[str] = []
 
     orphans = state.all_markdown_files - state.referenced_markdown_files
@@ -65,14 +65,14 @@ def check_orphaned_documents(state: GlobalMetadataState) -> List[str]:
     for orphan in sorted(list(orphans)):
         try:
             pretty_path = os.path.relpath(orphan, os.getcwd()).replace('\\', '/')
-            warnings.append(f"Orphaned Document: Niemand verlinkt auf '{pretty_path}'. Bitte referenzieren.")
+            warnings.append(f"Verwaistes Dokument: Die Datei '{pretty_path}' wird nirgendwo im Repository referenziert. Bitte füge einen Link zu dieser Datei hinzu (z.B. in der README.md des Ordners) oder lösche sie, falls sie obsolet ist.")
         except: pass
 
     return warnings
 
 @processor(match="**/*.md", phase=2)
 def backlink_enforcement(node: MarkdownNode) -> List[str]:
-    """Stellt sicher, dass jede MD-Datei einen Backlink zur nächstgelegenen README am Anfang hat."""    
+    """Erzwingt eine saubere Navigationsstruktur durch verpflichtende Backlinks zur nächsten README.md."""    
     rel_path = node.rel_path.as_posix()
     filename = node.name
 
@@ -82,14 +82,23 @@ def backlink_enforcement(node: MarkdownNode) -> List[str]:
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return []
 
+    # Bestimme das Startverzeichnis für die Suche nach einer README.md
+    if filename == "README.md":
+        # Wenn wir selbst eine README sind, suchen wir im ELTERN-Ordner
+        search_dir = os.path.dirname(os.path.dirname(rel_path))
+    else:
+        # Wenn wir eine normale Datei sind, suchen wir im EIGENEN Ordner oder höher
+        search_dir = os.path.dirname(rel_path)
+
     target_rel_path = None
-    search_dir: str = os.path.dirname(rel_path)
+    target_repo_path = None
 
     while True:
         potential_readme = os.path.join(search_dir, "README.md").replace('\\', '/')
         if os.path.exists(potential_readme):
-            # Calculate path from current file's directory to the README
+            # Berechne den Pfad von der aktuellen Datei zur gefundenen README
             target_rel_path = os.path.relpath(potential_readme, os.path.dirname(rel_path)).replace('\\', '/')
+            target_repo_path = potential_readme
             break
 
         if not search_dir or search_dir == ".":
@@ -125,8 +134,12 @@ def backlink_enforcement(node: MarkdownNode) -> List[str]:
     pattern = rf'\[.*\]\({regex_path}\)'
 
     if not re.search(pattern, search_block):
-        loc = "nach dem Frontmatter" if is_marp else "am Dateianfang"
-        return [f"Fehlender oder falscher Backlink {loc}! Erwartet: Link auf '{target_rel_path}'."]      
+        loc = "direkt nach dem Frontmatter" if is_marp else "am Dateianfang (in den ersten 5 Zeilen)"
+        return [
+            f"Strukturfehler: Diese Datei muss einen Backlink zur übergeordneten Dokumentation '{target_repo_path}' enthalten.",
+            f"Handlungsempfehlung: Bitte füge {loc} folgenden Markdown-Link ein: [Zurück]({target_rel_path})"
+        ]
 
     return []
+
 

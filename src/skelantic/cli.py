@@ -109,6 +109,9 @@ def main() -> None:
     # MIGRATE
     subparsers.add_parser("migrate", help="Update repository to match installed Skelantic version.")
 
+    # PROCESSORS
+    subparsers.add_parser("processors", help="List all registered processors and their details.")
+
     # INFO
     info_parser = subparsers.add_parser("info", help="Inspect a path against the schema.")
     info_parser.add_argument("path", help="The path to inspect.")
@@ -200,6 +203,47 @@ def main() -> None:
         _deploy_skill()
         print(f"✅ Repository migrated to Skelantic {installed}.")
         print(f"📜 Please read the migration docs in .gemini/skills/skelantic/docs/migrations/ for refactoring steps.")
+
+    elif args.command == "processors":
+        sys.path.insert(0, os.getcwd())
+        processors_pkg = settings.get("processors_package")
+        
+        # Import internal core processors
+        import skelantic.commons.processors as _
+
+        # Import custom processors recursively
+        if processors_pkg:
+            try:
+                proc_module = importlib.import_module(processors_pkg)
+                if hasattr(proc_module, '__path__'):
+                    for _, module_name, _ in pkgutil.walk_packages(proc_module.__path__, f"{processors_pkg}."):
+                        importlib.import_module(module_name)
+            except ImportError as e:
+                print(f"Error importing processors: {e}"); sys.exit(1)
+
+        print("\nRegistered Skelantic Processors:")
+        print("-" * 50)
+        
+        # Group by phase for better overview
+        by_phase = {1: [], 2: [], 3: []}
+        for b in registry.bindings:
+            by_phase[b.phase or 2].append(b)
+            
+        for phase in [1, 2, 3]:
+            if not by_phase[phase]: continue
+            print(f"\n[PHASE {phase}]")
+            for b in sorted(by_phase[phase], key=lambda x: f"{x.func.__module__}.{x.func.__name__}"):
+                try:
+                    f_file = inspect.getfile(b.func)
+                    f_file = os.path.relpath(f_file, os.getcwd()).replace('\\', '/')
+                except: f_file = "Unknown"
+                
+                doc = (b.func.__doc__ or "No docstring.").strip().split('\n')[0]
+                print(f"⚙️ {b.func.__module__}:{b.func.__name__}")
+                print(f"   Match: {b.match or 'Type-based only'}")
+                print(f"   File:  {f_file}")
+                print(f"   Doc:   \"{doc}\"")
+        print("-" * 50)
 
     elif args.command == "info" or args.command == "template":
         sys.path.insert(0, os.getcwd())

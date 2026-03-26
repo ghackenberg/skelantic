@@ -27,7 +27,7 @@ def test_strict_by_default(tmp_path: Any) -> None:
     engine._walk_and_validate(str(tmp_path), config, all_files)  # pyright: ignore[reportPrivateUsage]
     
     assert engine.total_errors == 1
-    assert any("Fehlendes Element: 'required_file.md'" in e['msg'] for e in engine.results_tree["root"]["_errors"])
+    assert any("Fehlendes Element: Das erwartete Element 'required_file.md' wurde nicht gefunden" in e['msg'] for e in engine.results_tree["root"]["_errors"])
 
 def test_optional_flag(tmp_path: Any) -> None:
     linter_yaml = tmp_path / "linter.yaml"
@@ -45,7 +45,7 @@ def test_optional_flag(tmp_path: Any) -> None:
     
     assert engine.total_errors == 0
     assert engine.total_warnings == 1
-    assert "Kein Match für 'missing_but_optional.md'" in engine.results_tree["root"]["_warnings"][0]['msg']
+    assert "Kein Match für 'missing_but_optional.md': Dieses optionale Element fehlt im Dateisystem." in engine.results_tree["root"]["_warnings"][0]['msg']
 
 def test_silent_flag(tmp_path: Any) -> None:
     linter_yaml = tmp_path / "linter.yaml"
@@ -107,15 +107,23 @@ def test_unauthorized_file_error(tmp_path: Any) -> None:
 
 def test_linter_engine_init_and_run(tmp_path: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
-    with patch.object(engine, '_walk_and_validate') as mock_walk, \
-         patch.object(engine, '_run_templates') as mock_tmpl, \
-         patch.object(engine, '_run_phase') as mock_phase, \
-         patch.object(engine, '_run_global_phase') as mock_global:
-        engine.run(str(tmp_path))
-        mock_walk.assert_called_once()
-        mock_tmpl.assert_called_once()
-        assert mock_phase.call_count == 2
-        mock_global.assert_called_once_with(3)
+    
+    # Mock some phases in registry
+    mock_binding1 = MagicMock()
+    mock_binding1.phase = 1
+    mock_binding2 = MagicMock()
+    mock_binding2.phase = 2
+    
+    with patch.object(engine.registry, 'bindings', [mock_binding1, mock_binding2]):
+        with patch.object(engine, '_walk_and_validate') as mock_walk, \
+             patch.object(engine, '_run_templates') as mock_tmpl, \
+             patch.object(engine, '_run_phase') as mock_phase, \
+             patch.object(engine, '_run_global_phase') as mock_global:
+            engine.run(str(tmp_path))
+            mock_walk.assert_called_once()
+            mock_tmpl.assert_called_once()
+            assert mock_phase.call_count == 2
+            assert mock_global.call_count == 2
 
 def test_linter_engine_log(capsys: Any) -> None:
     engine = LinterEngine(registry, verbose=True, models_module="test_models")
@@ -269,7 +277,7 @@ def test_print_report(capsys: Any) -> None:
     assert "dir1/" in captured.out
     assert "error 1" in captured.out
     assert "warn 1" in captured.out
-    assert "[Processor: m (mod)]" in captured.out
+    assert "⚙️ mod:m" in captured.out
 
 
 def test_walk_and_validate_permission_error(tmp_path: Any) -> None:

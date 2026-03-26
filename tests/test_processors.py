@@ -19,7 +19,7 @@ def test_dead_link(tmp_path):
     
     res = dead_link(mock_node)
     assert len(res) == 1
-    assert "Dead Link" in res[0]
+    assert "Toter Link" in res[0]
 
 def test_build_document_graph(tmp_path):
     """Prüft, ob das Indexing von Markdown-Dateien funktioniert."""
@@ -82,8 +82,9 @@ def test_backlink_enforcement(tmp_path):
     
     # Sollte Fehler melden
     res = backlink_enforcement(mock_node)
-    assert len(res) == 1
-    assert "Fehlender oder falscher Backlink" in res[0]
+    assert len(res) == 2
+    assert "Strukturfehler" in res[0]
+    assert "Handlungsempfehlung" in res[1]
     
     # Mit korrektem Backlink
     doc.write_text("[Back](../README.md)\n# File")

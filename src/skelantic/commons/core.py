@@ -58,7 +58,17 @@ class LinterEngine:
     def run(self, base_dir: str = ".") -> None:
         all_files: List[Dict[str, Any]] = []
         self._walk_and_validate(base_dir, self.config, all_files, rel_path=".")
-        self._run_templates(all_files); self._run_phase(1, all_files); self._run_phase(2, all_files); self._run_global_phase(3)
+        self._run_templates(all_files)
+        
+        # Bestimme alle registrierten Phasen
+        all_phases = sorted(list(set(b.phase for b in self.registry.bindings if b.phase is not None)))
+        
+        for phase in all_phases:
+            # 1. Lokale Phase (für alle Dateien/Ordner)
+            self._run_phase(phase, all_files)
+            
+            # 2. Globale Phase (nur für 'root' Bindings)
+            self._run_global_phase(phase)
 
     def _run_templates(self, files_data: List[Dict[str, Any]]) -> None:
         for f_data in files_data:
@@ -246,23 +256,39 @@ class LinterEngine:
             indent += 1
             prefix = "   " * indent
         
+        # Gruppierung der Warnungen nach Prozessor
+        warn_groups = defaultdict(list)
         for w in node.get('_warnings', []):
-            msg = w['msg'] if isinstance(w, dict) else w
-            print(f"{prefix}⚠️ {msg}")
-            if isinstance(w, dict) and w.get('origin'):
-                o = w['origin']
-                print(f"{prefix}   [Processor: {o['method']} ({o['module']})]")
-                print(f"{prefix}   [File:      {o['file']}]")
-                if o['doc']: print(f"{prefix}   [Doc:       {o['doc']}]")
+            origin_key = f"{w['origin']['module']}:{w['origin']['method']}" if isinstance(w, dict) and w.get('origin') else "system"
+            warn_groups[origin_key].append(w)
+            
+        for origin_key, items in warn_groups.items():
+            if origin_key != "system":
+                o = items[0]['origin']
+                print(f"{prefix}⚙️ {o['module']}:{o['method']}")
+                for item in items:
+                    print(f"{prefix}   ⚠️ {item['msg']}")
+            else:
+                for item in items:
+                    msg = item['msg'] if isinstance(item, dict) else item
+                    print(f"{prefix}⚠️ {msg}")
 
+        # Gruppierung der Fehler nach Prozessor
+        err_groups = defaultdict(list)
         for e in node.get('_errors', []):
-            msg = e['msg'] if isinstance(e, dict) else e
-            print(f"{prefix}❌ {msg}")
-            if isinstance(e, dict) and e.get('origin'):
-                o = e['origin']
-                print(f"{prefix}   [Processor: {o['method']} ({o['module']})]")
-                print(f"{prefix}   [File:      {o['file']}]")
-                if o['doc']: print(f"{prefix}   [Doc:       {o['doc']}]")
+            origin_key = f"{e['origin']['module']}:{e['origin']['method']}" if isinstance(e, dict) and e.get('origin') else "system"
+            err_groups[origin_key].append(e)
+            
+        for origin_key, items in err_groups.items():
+            if origin_key != "system":
+                o = items[0]['origin']
+                print(f"{prefix}⚙️ {o['module']}:{o['method']}")
+                for item in items:
+                    print(f"{prefix}   ❌ {item['msg']}")
+            else:
+                for item in items:
+                    msg = item['msg'] if isinstance(item, dict) else item
+                    print(f"{prefix}❌ {msg}")
 
         for child_name, child_node in sorted(node.items()):
             if child_name not in ['_errors', '_warnings']: self._print_node(child_name, child_node, indent)
@@ -341,7 +367,7 @@ class LinterEngine:
                         extracted_k = match.groupdict()
                         
             if matched_n is None:
-                self._add_results("ERROR", entry_rp, [f"Unerlaubte(r) {'Ordner' if is_d else 'Datei'}!"])
+                self._add_results("ERROR", entry_rp, [f"Unerlaubte(r) {'Ordner' if is_d else 'Datei'}: Dieses Element ist nicht in der Konfiguration (config.yaml) erlaubt. Bitte definiere es in der Konfiguration oder lösche das Element."])
                 continue
                 
             if matched_n.get('ignore'):
@@ -357,5 +383,5 @@ class LinterEngine:
         for m in d_m + f_m:
             if not m['matched']:
                 is_opt = m['config'].get('optional', False)
-                if not is_opt: self._add_results("ERROR", rel_path, [f"Fehlendes Element: '{m['pattern']}': Datei/Ordner existiert nicht."])
-                elif not m['config'].get('silent', False): self._add_results("WARNING", rel_path, [f"Kein Match für '{m['pattern']}'"])
+                if not is_opt: self._add_results("ERROR", rel_path, [f"Fehlendes Element: Das erwartete Element '{m['pattern']}' wurde nicht gefunden. Bitte erstelle die Datei/den Ordner oder markiere das Element in der Konfiguration als 'optional: true'."])
+                elif not m['config'].get('silent', False): self._add_results("WARNING", rel_path, [f"Kein Match für '{m['pattern']}': Dieses optionale Element fehlt im Dateisystem."])
