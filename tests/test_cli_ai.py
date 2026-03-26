@@ -75,6 +75,9 @@ def test_cli_info_with_processors(tmp_path, monkeypatch, capsys):
     
     from skelantic.commons.decorators import registry, ProcessorBinding
     import re
+    # Clear registry for clean test
+    registry.bindings = []
+    
     def my_test_proc(node):
         """Validates the test file."""
         return []
@@ -173,6 +176,63 @@ def test_cli_resolver_base(tmp_path):
     assert res.match_path == "test.md"
     assert res.is_directory == False
 
+def test_cli_info_processor_import_error(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    (tmp_path / ".skelantic/config.yaml").write_text("description: 'r'\nfiles: {test.md: {}}")
+    with open(tmp_path / ".skelantic/settings.yaml", "w") as f:
+        yaml.dump({"types_module": "types", "processors_package": "non_existent_pkg"}, f)
+        
+    with patch('importlib.metadata.version', return_value='0.2.0'):
+        monkeypatch.setattr(sys, 'argv', ['skelantic', 'info', 'test.md'])
+        with patch('importlib.import_module', side_effect=[ImportError("fail"), ImportError("fail")]):
+            with pytest.raises(SystemExit): main()
+            assert "Error loading types" in capsys.readouterr().out
+
+def test_cli_info_with_string_annotation(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    
+    config = {
+        "description": "root",
+        "files": {
+            "test.md": {"description": "d"}
+        }
+    }
+    with open(tmp_path / ".skelantic/config.yaml", "w") as f:
+        yaml.dump(config, f)
+        
+    with open(tmp_path / ".skelantic/settings.yaml", "w") as f:
+        yaml.dump({"types_module": "types"}, f)
+
+    class TestMd: pass
+    mock_types = MagicMock()
+    mock_types.TestMd = TestMd
+    mock_types.__SKELANTIC_NODE_MAP__ = {"test.md": TestMd}
+    
+    from skelantic.commons.decorators import registry, ProcessorBinding
+    import re
+    # Clear registry for clean test
+    registry.bindings = []
+    
+    # Use string annotation "TestMd"
+    def my_string_proc(node: "TestMd"):
+        """Doc string for eval test."""
+        return []
+    
+    with patch('importlib.metadata.version', return_value='0.2.0'):
+        with patch('importlib.import_module', return_value=mock_types):
+            with patch('skelantic.cli.eval', return_value=TestMd):
+                binding = ProcessorBinding(name="test", func=my_string_proc, match=None, phase=2)
+                registry.bindings.append(binding)
+                
+                monkeypatch.setattr(sys, 'argv', ['skelantic', 'info', 'test.md'])
+                main()
+                out = capsys.readouterr().out
+                assert "my_string_proc" in out
+
 def test_cli_misc(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['skelantic'])
     main()
@@ -195,7 +255,7 @@ def test_cli_info_allowed_children(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     os.makedirs(".skelantic")
     (tmp_path / ".skelantic/version").write_text("0.2.0")
-    (tmp_path / ".skelantic/config.yaml").write_text("directories: {subdir: {files: {item.md: {}}}}", encoding="utf-8")
+    (tmp_path / ".skelantic/config.yaml").write_text("description: 'r'\ndirectories: {subdir: {files: {item.md: {}}}}", encoding="utf-8")
     with open(tmp_path / ".skelantic/settings.yaml", "w") as f:
         yaml.dump({"types_module": "types"}, f)
         

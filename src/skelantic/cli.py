@@ -134,12 +134,15 @@ def main() -> None:
             print("❌ ERROR: 'types_module' is not defined in .skelantic/settings.yaml")
             sys.exit(1)
 
+        # Import internal core processors
+        import skelantic.commons.processors as _
+
         if processors_pkg:
             try:
                 proc_module = importlib.import_module(processors_pkg)
                 if hasattr(proc_module, '__path__'):
-                    for _, module_name, _ in pkgutil.iter_modules(proc_module.__path__): # type: ignore
-                        importlib.import_module(f"{processors_pkg}.{module_name}")
+                    for _, module_name, _ in pkgutil.walk_packages(proc_module.__path__, f"{processors_pkg}."):
+                        importlib.import_module(module_name)
             except ImportError as e:
                 print(f"Error importing processors: {e}"); sys.exit(1)
 
@@ -201,9 +204,24 @@ def main() -> None:
     elif args.command == "info" or args.command == "template":
         sys.path.insert(0, os.getcwd())
         types_mod_name = settings.get("types_module")
+        processors_pkg = settings.get("processors_package")
+        
         if not types_mod_name:
             print("❌ ERROR: 'types_module' is not defined in .skelantic/settings.yaml")
             sys.exit(1)
+            
+        # Import internal core processors
+        import skelantic.commons.processors as _
+
+        # Import processors recursively so they register themselves in the registry
+        if processors_pkg:
+            try:
+                proc_module = importlib.import_module(processors_pkg)
+                if hasattr(proc_module, '__path__'):
+                    # RECURSIVE WALK
+                    for _, module_name, _ in pkgutil.walk_packages(proc_module.__path__, f"{processors_pkg}."):
+                        importlib.import_module(module_name)
+            except ImportError: pass # Silence if package doesn't exist
             
         try:
             types_module = importlib.import_module(types_mod_name)
@@ -219,17 +237,23 @@ def main() -> None:
             sys.exit(1)
             
         if args.command == "info":
-            print(f"Path:   {args.path}")
+            print(f"Path:   {args.path.replace('\\', '/')}")
             print(f"Status: {'✅ MATCHED' if res.exists else '👻 SCHEMA MATCH (File does not exist yet)'}")
             print("-" * 50)
             print("--- Configuration State ---")
-            print(f"Full Match Path:    {res.match_path}")
-            print(f"Parent Folder Path: {res.parent_folder}")
+            print(f"Full Match Path:    {res.match_path.replace('\\', '/')}")
+            print(f"Parent Folder Path: {res.parent_folder.replace('\\', '/')}")
             print(f"Description:        {res.config.get('description', 'N/A')}")
             print(f"Ignore:             {res.config.get('ignore', False)}")
             print(f"Optional:           {res.config.get('optional', False)}")
             print(f"Silent:             {res.config.get('silent', False)}")
-            print(f"Template File:      {res.template_path or 'None'}")
+            
+            t_file_rel = "None"
+            if res.template_path:
+                try: t_file_rel = os.path.relpath(res.template_path, os.getcwd()).replace('\\', '/')
+                except: t_file_rel = res.template_path.replace('\\', '/')
+            print(f"Template File:      {t_file_rel}")
+            
             print("\n--- Python Injection Interface ---")
             print(f"Node Type:   {res.node_type or 'N/A'}")
             print(f"Parent Type: {res.parent_type or 'N/A'}")
@@ -263,16 +287,36 @@ def main() -> None:
                 if binding.match == "root" and args.path == ".": is_match = True
                 elif binding.regex and binding.regex.match(args.path): is_match = True
                 
-                # Check if type matches (very basic string check for now)
-                # In a real scenario we'd do deeper introspection
+                # Check if type matches
+                if not is_match:
+                    sig = inspect.signature(binding.func)
+                    params = list(sig.parameters.values())
+                    if params:
+                        first_param = params[0]
+                        if first_param.annotation != inspect.Parameter.empty:
+                            # Resolve actual node class
+                            node_cls = None
+                            if res.match_path in node_map: node_cls = node_map[res.match_path]
+                            elif args.path == "." and "root" in node_map: node_cls = node_map["root"]
+                            
+                            if node_cls:
+                                target_anno = first_param.annotation
+                                # Handle forward references if necessary
+                                if isinstance(target_anno, str):
+                                    try: target_anno = eval(target_anno, vars(types_module))
+                                    except: pass
+                                
+                                try:
+                                    if isinstance(target_anno, type) and issubclass(node_cls, target_anno):
+                                        is_match = True
+                                except: pass
                 
                 if is_match:
                     found_procs = True
-                    f_file = inspect.getfile(binding.func)
-                    # Make path relative to repo root
                     try:
-                        f_file = os.path.relpath(f_file, os.getcwd())
-                    except: pass
+                        f_file = inspect.getfile(binding.func)
+                        f_file = os.path.relpath(f_file, os.getcwd()).replace('\\', '/')
+                    except: f_file = "Unknown"
                     
                     doc = (binding.func.__doc__ or "No docstring.").strip().split('\n')[0]
                     print(f"- Function: {binding.func.__name__} (Phase {binding.phase})")
@@ -285,15 +329,19 @@ def main() -> None:
             if res.is_directory:
                 print("\n--- Allowed Children (Navigation) ---")
                 print("📁 Folders:")
-                for d in sorted(res.allowed_child_dirs): print(f"  - {d}")
+                for d in sorted(res.allowed_child_dirs): print(f"  - {d.replace('\\', '/')}")
                 print("📄 Files:")
-                for f in sorted(res.allowed_child_files): print(f"  - {f}")
+                for f in sorted(res.allowed_child_files): print(f"  - {f.replace('\\', '/')}")
         else:
             # template command
             if not res.template_path:
                 print(f"❌ No template defined for path '{args.path}'.")
                 sys.exit(1)
-            print(f"Template File: {res.template_path}")
+            
+            t_file_rel = res.template_path
+            try: t_file_rel = os.path.relpath(res.template_path, os.getcwd()).replace('\\', '/')
+            except: t_file_rel = t_file_rel.replace('\\', '/')
+            print(f"Template File: {t_file_rel}")
             print("-" * 50)
             try:
                 with open(res.template_path, 'r', encoding='utf-8') as f:
