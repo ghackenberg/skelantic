@@ -30,6 +30,7 @@ def test_cli_init(tmp_path, monkeypatch):
 
     # Verify pyproject.toml
     pyproj = (tmp_path / "pyproject.toml").read_text()
+    assert f'name = "{tmp_path.name}"' in pyproj
     assert 'dependencies = ["skelantic>=0.2.0"]' in pyproj
 
     # Verify NO top-level src/tests

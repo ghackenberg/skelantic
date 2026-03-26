@@ -270,8 +270,9 @@ def main() -> None:
             
             pyproj = pathlib.Path("pyproject.toml")
             if not pyproj.exists():
+                project_name = os.path.basename(os.getcwd())
                 content = "[project]\n"
-                content += "name = \"project-governed-by-skelantic\"\n"
+                content += f"name = \"{project_name}\"\n"
                 content += "version = \"0.1.0\"\n"
                 content += f"dependencies = [\"skelantic>={installed}\"]\n\n"
                 content += "[tool.pyright]\n"
