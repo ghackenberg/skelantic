@@ -1,6 +1,6 @@
 ---
 name: skelantic
-description: "Skelantic strictly governs this repository's architecture. CRITICAL RULES: 1. You MUST run `skelantic run` after modifying or creating any files. 2. NEVER create files or directories that are not explicitly allowed in a `.skelantic/config.yaml`. 3. ALWAYS run `skelantic generate` after modifying a config or template. Activate this skill for detailed instructions on how to manage the repository structure."
+description: "Skelantic strictly governs this repository's architecture. CRITICAL RULES: 1. You MUST run `skelantic verify` after every modification to ensure architectural, type, and logic integrity. 2. NEVER create files or directories that are not explicitly allowed in a `.skelantic/config.yaml`. 3. If any step in verify fails, run the specific command with `-v` (e.g., `skelantic run -v`) for detailed traces. Activate this skill for detailed instructions."
 ---
 
 # 🛡️ Skelantic Agent Skill

@@ -11,10 +11,7 @@ Skelantic is a framework for file-tree processing and repository governance. It 
 
 ### Dynamic Processing Phases
 
-When the engine runs (`engine.run()`), it discovers all registered phase numbers from the `@processor` decorators and executes them in ascending order. Each phase consists of two steps:
-
-1. **Local Pass**: Executes all processors matched to specific files or directories (including type-based matches).
-2. **Global Pass**: Executes all processors matched to `"root"`.
+When the engine runs (`engine.run()`), it discovers all registered phase numbers from the `@processor` decorators and executes them in ascending order. In each phase, the engine iterates over **all** elements of the repository (files, directories, and the root node).
 
 Commonly used phases are:
 
@@ -23,7 +20,7 @@ Commonly used phases are:
 | **Pass 0** | **Implicit: Template Matching** (Always runs first, extracting data into `node.data`). |
 | **Pass 1** | **Indexing**: Collect data into global Pydantic state models. |
 | **Pass 2** | **Validation**: Perform per-node constraints and checks. |
-| **Pass 3** | **Global Checks**: Perform repository-wide validations (e.g., finding orphaned files). |
+| **Pass 3** | **Global Checks**: Perform repository-wide validations (usually targeting the `RootNode`). |
 
 *Note: You can define any integer as a phase (e.g., `phase=10`) to insert logic between or after these standard steps.*
 

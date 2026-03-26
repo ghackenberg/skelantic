@@ -4,11 +4,13 @@ When Skelantic traverses your repository, it wraps every file and directory into
 
 ## The Node Class Hierarchy
 
-Skelantic provides three main node types:
+Skelantic provides four main node types:
 
 1. **`FSNode`** (Base Class)
 2. **`DirectoryNode`** (Inherits from FSNode)
-3. **`FileNode`** (Inherits from FSNode)
+3. **`RootNode`** (Inherits from DirectoryNode, represents the repository root)
+4. **`FileNode`** (Inherits from FSNode)
+5. **`MarkdownNode`** (Inherits from FileNode, provides markdown-specific helpers)
 
 ## Injecting Nodes into Processors
 

@@ -4,7 +4,7 @@ Skelantic operates in four distinct passes (phases). Understanding these phases,
 
 ## 1. Dynamic Processing Phases
 
-When the engine runs (`skelantic run`), it discovers all registered phase numbers from the `@processor` decorators and executes them in ascending order. Each phase consists of a **Local Pass** (per node) and a **Global Pass** (root only).
+When the engine runs (`skelantic run`), it discovers all registered phase numbers from the `@processor` decorators and executes them in ascending order. In each phase, the engine iteratess over **all** elements of the repository (files, directories, and the root node).
 
 Common phases used in the architecture:
 
@@ -13,7 +13,7 @@ Common phases used in the architecture:
 | **Pass 0** | **Implicit: Template Matching** (Always runs first). |
 | **Phase 1** | **Indexing**: Collect data into global Singleton state models. |
 | **Phase 2** | **Validation**: Domain-specific logic on a per-node basis. |
-| **Phase 3** | **Global Pass**: Repository-wide integrity checks. |
+| **Phase 3** | **Global Pass**: Repository-wide integrity checks (usually targeting the `RootNode`). |
 
 *You can use any integer for a phase to define your own execution order.*
 
@@ -69,7 +69,7 @@ Simply add your state class to the processor's signature. **Skelantic will autom
 from typing import Set, List
 from pydantic import BaseModel, Field
 from skelantic.commons.decorators import processor
-from skelantic.commons.nodes import MarkdownNode
+from skelantic.commons.nodes import MarkdownNode, RootNode
 from tools.skelantic_types import RepoGraph
 
 # 1. Define your custom State
@@ -87,8 +87,9 @@ def collect_links(node: MarkdownNode, state: DocumentState, tracer: Callable[[st
         state.referenced_files.add(link)
 
 # 3. Inject it into Phase 3 to validate global constraints
-@processor(match="root", phase=3)
-def check_orphans(state: DocumentState, tracer: Callable[[str], None]) -> List[str]:
+#    (Targeting the RootNode ensures this runs exactly once)
+@processor(phase=3)
+def check_orphans(node: RootNode, state: DocumentState, tracer: Callable[[str], None]) -> List[str]:
     tracer("Starting orphaned documents check")
     orphans = state.all_markdown_files - state.referenced_files
     if orphans:
