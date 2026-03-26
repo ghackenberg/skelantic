@@ -233,6 +233,20 @@ def test_cli_info_with_string_annotation(tmp_path, monkeypatch, capsys):
                 out = capsys.readouterr().out
                 assert "my_string_proc" in out
 
+def test_cli_run_import_processors_error(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(".skelantic")
+    (tmp_path / ".skelantic/version").write_text("0.2.0")
+    with open(tmp_path / ".skelantic/settings.yaml", "w") as f:
+        yaml.dump({"types_module": "types", "processors_package": "fail_pkg"}, f)
+        
+    with patch('importlib.metadata.version', return_value='0.2.0'):
+        monkeypatch.setattr(sys, 'argv', ['skelantic', 'run'])
+        # 1st call: importlib.import_module('fail_pkg') -> raises ImportError
+        with patch('importlib.import_module', side_effect=ImportError("fail")):
+            with pytest.raises(SystemExit): main()
+            assert "Error importing processors" in capsys.readouterr().out
+
 def test_cli_misc(tmp_path, capsys, monkeypatch):
     monkeypatch.setattr(sys, 'argv', ['skelantic'])
     main()

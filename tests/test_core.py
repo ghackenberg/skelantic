@@ -1,8 +1,9 @@
 # pyright: reportPrivateUsage=false
 import yaml
 import re
+import os
 from unittest.mock import patch, MagicMock, mock_open
-from skelantic.commons.core import LinterEngine
+from skelantic.commons.core import LinterEngine, get_specificity_score, tree
 from skelantic.commons.config import ConfigLoader
 from skelantic.commons.decorators import registry
 
@@ -289,3 +290,13 @@ def test_walk_and_validate_local_config(tmp_path: Any) -> None:
     # First dir doesn't pick up local config as child config if rel_path=="." but will load it as lcp_new
     engine._walk_and_validate(str(tmp_path), {}, all_files, rel_path="subdir")
     assert any(f['filename'] == 'local.md' for f in all_files)
+
+def test_get_specificity_score() -> None:
+    assert get_specificity_score("a/b/c") > get_specificity_score("a/*/c")
+    assert get_specificity_score("a/*/c") > get_specificity_score("a/**/c")
+    assert get_specificity_score("a/b/c") > get_specificity_score("a/{v}/c")
+
+def test_tree_defaultdict() -> None:
+    t = tree()
+    t['a']['b']['c'] = 1
+    assert t['a']['b']['c'] == 1

@@ -1,6 +1,7 @@
 import pytest
 from skelantic.commons.config import ConfigLoader, get_regex
 import yaml
+from unittest.mock import patch
 
 def test_config_loader_errors(tmp_path):
     def cb(sev, p, res): pass
@@ -27,6 +28,14 @@ def test_config_loader_errors(tmp_path):
         }
     }))
     loader.load_config(str(bad_conf))
+
+def test_config_loader_not_a_dict():
+    def cb(sev, p, res): pass
+    loader = ConfigLoader(cb)
+    # Test with string instead of dict
+    with patch("yaml.safe_load", return_value="not a dict"):
+        loader._validate_config("not a dict", "dummy.yaml")
+        # Should have added an error
 
 def test_config_ignore_validation(tmp_path):
     # Test our new ignore restrictions

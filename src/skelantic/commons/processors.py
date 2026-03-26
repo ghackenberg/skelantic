@@ -1,30 +1,34 @@
 import re
 import os
-from typing import List, cast
+from typing import List, Set, cast
+from pydantic import BaseModel, Field
 from .decorators import processor
-from .documents import MarkdownDocument
-from .context import LinterContext
-from .nodes import FileNode
+from .nodes import FileNode, MarkdownNode
+
+# --- GLOBAL STATE ---
+
+class GlobalMetadataState(BaseModel):
+    """Sammelt repository-weite Metadaten für die Validierung."""
+    all_markdown_files: Set[str] = Field(default_factory=set)
+    referenced_markdown_files: Set[str] = Field(default_factory=set)
 
 # --- CORE LINTER RULES ---
 
 @processor(match="**/*.md", phase=2)
-def dead_link(node: FileNode) -> List[str]:
+def dead_link(node: MarkdownNode) -> List[str]:
     """Checks for broken relative links in markdown files."""
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return []
+    
     errors: List[str] = []
-    if not hasattr(node, 'document'):
-        return []
-    doc = cast(MarkdownDocument, node.document)
-    links = doc.get_links()
+    links = node.document.get_links()
     
     for link in links:
         link_path = link.split('#')[0]
         if not link_path: continue
         
-        target_abs_path = (node.parent_dir / link_path).resolve()
+        target_abs_path = (node.abs_path.parent / link_path).resolve()
         
         if not target_abs_path.exists():
             errors.append(f"Dead Link: Verweist auf '{link}', aber Ziel existiert nicht!")
@@ -32,54 +36,42 @@ def dead_link(node: FileNode) -> List[str]:
     return errors
 
 @processor(match="**/*.md", phase=1)
-def build_document_graph(node: FileNode, ctx: LinterContext) -> None:
+def build_document_graph(node: MarkdownNode, state: GlobalMetadataState) -> None:
     """Phase 1: Sammelt alle Markdown-Dateien und alle Referenzen (Links) im gesamten Repo."""
-
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return
 
     abs_filepath = node.abs_path.as_posix()
 
-    if "all_markdown_files" not in ctx.store:
-        ctx.store["all_markdown_files"] = set()
-
     if rel_path != "README.md":
-        cast(set[str], ctx.store["all_markdown_files"]).add(abs_filepath)
+        state.all_markdown_files.add(abs_filepath)
 
-    if not hasattr(node, 'document'):
-        return
-
-    doc = cast(MarkdownDocument, node.document)
-    links = doc.get_links()
-
-    if "referenced_markdown_files" not in ctx.store:
-        ctx.store["referenced_markdown_files"] = set()
+    links = node.document.get_links()
 
     for link in links:
         link_path = link.split('#')[0]
         if not link_path: continue
-        target_abs_path = (node.parent_dir / link_path).resolve()
-        cast(set[str], ctx.store["referenced_markdown_files"]).add(target_abs_path.as_posix())
+        target_abs_path = (node.abs_path.parent / link_path).resolve()
+        state.referenced_markdown_files.add(target_abs_path.as_posix())
 
 @processor(match="root", phase=3)
-def check_orphaned_documents(ctx: LinterContext) -> List[str]:
+def check_orphaned_documents(state: GlobalMetadataState) -> List[str]:
     """Phase 3: Prüft, ob es gibt Dateien gibt, die nie referenziert wurden."""
     warnings: List[str] = []
 
-    all_markdown_files = ctx.store.get("all_markdown_files", set())
-    referenced_markdown_files = ctx.store.get("referenced_markdown_files", set())
-
-    orphans = all_markdown_files - referenced_markdown_files
+    orphans = state.all_markdown_files - state.referenced_markdown_files
 
     for orphan in sorted(list(orphans)):
-        pretty_path = os.path.relpath(orphan, os.getcwd()).replace('\\', '/')
-        warnings.append(f"Orphaned Document: Niemand verlinkt auf '{pretty_path}'. Bitte referenzieren.")
+        try:
+            pretty_path = os.path.relpath(orphan, os.getcwd()).replace('\\', '/')
+            warnings.append(f"Orphaned Document: Niemand verlinkt auf '{pretty_path}'. Bitte referenzieren.")
+        except: pass
 
     return warnings
 
 @processor(match="**/*.md", phase=2)
-def backlink_enforcement(node: FileNode) -> List[str]:
+def backlink_enforcement(node: MarkdownNode) -> List[str]:
     """Stellt sicher, dass jede MD-Datei einen Backlink zur nächstgelegenen README am Anfang hat."""    
     rel_path = node.rel_path.as_posix()
     filename = node.name
@@ -91,13 +83,13 @@ def backlink_enforcement(node: FileNode) -> List[str]:
         return []
 
     target_rel_path = None
-
-    search_dir: str = os.path.dirname(rel_path) if filename == "README.md" else rel_path
+    search_dir: str = os.path.dirname(rel_path)
 
     while True:
         potential_readme = os.path.join(search_dir, "README.md").replace('\\', '/')
         if os.path.exists(potential_readme):
-            target_rel_path = os.path.relpath(potential_readme, rel_path).replace('\\', '/')
+            # Calculate path from current file's directory to the README
+            target_rel_path = os.path.relpath(potential_readme, os.path.dirname(rel_path)).replace('\\', '/')
             break
 
         if not search_dir or search_dir == ".":
@@ -105,9 +97,6 @@ def backlink_enforcement(node: FileNode) -> List[str]:
         search_dir = os.path.dirname(search_dir)
 
     if not target_rel_path:
-        return []
-
-    if not hasattr(node, 'document'):
         return []
 
     raw = node.document.raw_content
@@ -140,3 +129,4 @@ def backlink_enforcement(node: FileNode) -> List[str]:
         return [f"Fehlender oder falscher Backlink {loc}! Erwartet: Link auf '{target_rel_path}'."]      
 
     return []
+

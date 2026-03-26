@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 def test_core_run_global_phase_success():
     engine = LinterEngine(registry)
     
-    def good_global_rule(ctx):
+    def good_global_rule():
         return ["global warning"]
         
     class MockBinding:

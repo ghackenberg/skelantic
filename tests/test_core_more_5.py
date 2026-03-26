@@ -68,7 +68,6 @@ def test_core_global_phase_crash():
     def bad_global_rule():
         raise ValueError("global boom")
         
-    engine._execute_rule = MagicMock()
     # Mock registry to return our bad rule
     class MockBinding:
         phase = 3

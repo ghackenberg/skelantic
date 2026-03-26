@@ -148,26 +148,25 @@ class LinterEngine:
                 if binding.phase != phase:
                     continue
 
-                is_match = False
-                
-                # Check regex match
+                # 1. Regex Match (if provided)
                 if binding.regex:
-                    match = binding.regex.match(rp)
-                    if match:
-                        is_match = True
-                        
-                # Check type hint match
+                    if not binding.regex.match(rp):
+                        continue
+                
+                # 2. Type Hint Match (if provided)
                 sig = inspect.signature(binding.func)
                 params = list(sig.parameters.values())
-                if params and issubclass(type(node), FSNode):
+                if params:
                     first_param = params[0]
-                    if first_param.annotation != inspect.Parameter.empty and isinstance(node, first_param.annotation):
-                        is_match = True
+                    if first_param.annotation != inspect.Parameter.empty:
+                        # Allow injection of node, but only if type matches
+                        if first_param.name == 'node':
+                            if not isinstance(node, first_param.annotation):
+                                continue
                         
-                if is_match:
-                    self._execute_rule(binding.func, binding.name, node, f_data)
+                self._execute_rule(binding.func, binding.name, node, f_data)
 
-    def _execute_rule(self, func: Any, rule_name: str, node: Any, f_data: Dict[str, Any]) -> None:
+    def _execute_rule(self, func: Any, rule_name: str, node: Optional[Any], f_data: Optional[Dict[str, Any]]) -> List[str]:
         from pydantic import BaseModel
         sig = inspect.signature(func)
         kwargs: Dict[str, Any] = {}
@@ -190,16 +189,23 @@ class LinterEngine:
         try:
             res = func(**kwargs)
             if res:
-                if current_traces:
-                    safe_path = f_data['rel_path'].replace('/', '_').replace('\\', '_')
-                    trace_dir = os.path.join(os.getcwd(), ".skelantic", "traces")
-                    os.makedirs(trace_dir, exist_ok=True)
-                    trace_file = os.path.join(trace_dir, f"{rule_name}_{safe_path}.log")
-                    with open(trace_file, "w", encoding="utf-8") as f:
-                        f.write("\n".join(current_traces))
-                    res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
-                self._add_results("ERROR", f_data['rel_path'], res)
-        except Exception as e: self._add_results("ERROR", f_data['rel_path'], [f"Crash '{rule_name}': {e}"])
+                if f_data:
+                    if current_traces:
+                        safe_path = f_data['rel_path'].replace('/', '_').replace('\\', '_')
+                        trace_dir = os.path.join(os.getcwd(), ".skelantic", "traces")
+                        os.makedirs(trace_dir, exist_ok=True)
+                        trace_file = os.path.join(trace_dir, f"{rule_name}_{safe_path}.log")
+                        with open(trace_file, "w", encoding="utf-8") as f:
+                            f.write("\n".join(current_traces))
+                        res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
+                    self._add_results("ERROR", f_data['rel_path'], res)
+                else:
+                    self._add_results("WARNING", "root", res)
+            return res or []
+        except Exception as e:
+            prefix = "Global " if f_data is None else ""
+            self._add_results("ERROR", f_data['rel_path'] if f_data else "root", [f"{prefix}Crash '{rule_name}': {e}"])
+            return []
 
     def _run_global_phase(self, phase: int) -> None:
         for binding in self.registry.bindings:
@@ -208,13 +214,9 @@ class LinterEngine:
             if binding.match != "root" and binding.match is not None:
                 continue
                 
-            sig = inspect.signature(binding.func)
-            kwargs: Dict[str, Any] = {}
-            if 'ctx' in sig.parameters: kwargs['ctx'] = self.ctx
-            try:
-                res = binding.func(**kwargs)
-                if res: self._add_results("WARNING", "root", res)
-            except Exception as e: self._add_results("ERROR", "root", [f"Global Crash '{binding.name}': {e}"])
+            res = self._execute_rule(binding.func, binding.name, None, None)
+            if res:
+                self._add_results("WARNING", "root", res)
 
     def _add_results(self, severity: str, full_rel_path: str, results: List[str]) -> None:
         if not results: return
