@@ -237,19 +237,21 @@ def test_execute_rule_success_and_crash() -> None:
     assert any("Crash 'crash_rule': boom" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
 
 def test_run_phase_with_root_processor() -> None:
+    from skelantic.commons.nodes import RootNode
     engine = LinterEngine(registry, models_module="test_models")
 
-    def my_global_proc(node: Any, tracer: Any) -> List[str]:
+    def my_global_proc(node: RootNode, tracer: Any) -> List[str]:
         return ["global warn"]
 
     mock_binding = MagicMock()
     mock_binding.phase = 3
-    mock_binding.match = "root"
+    mock_binding.match = None # No string match
     mock_binding.func = my_global_proc
     mock_binding.name = "global_rule"
     mock_binding.regex = None
 
     engine.registry.bindings = [mock_binding]
+    # Root node is automatically instantiated as RootNode
     engine._run_phase(3, [{'rel_path': '.', 'abs_path': '/fake', 'is_directory': True}])
     assert engine.total_warnings == 1
     assert any("global warn" in w['msg'] for w in engine.results_tree['root']['_warnings'])

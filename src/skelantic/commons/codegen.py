@@ -195,7 +195,10 @@ class CodeGenerator:
                 else:
                     base_class = "FileNode"
             else:
-                base_class = "DirectoryNode"
+                if not path_parts:
+                    base_class = "RootNode"
+                else:
+                    base_class = "DirectoryNode"
 
             out = f"{indent}class {class_name}({base_class}):\n"
             inner_indent = indent + "    "
@@ -360,7 +363,7 @@ class CodeGenerator:
             out += "from pydantic import BaseModel\n"
             
         out += "from typing import Optional, List, cast\n"
-        out += "from skelantic.commons.nodes import FileNode, DirectoryNode, MarkdownNode\n\n"
+        out += "from skelantic.commons.nodes import FileNode, DirectoryNode, MarkdownNode, RootNode\n\n"
         
         out += "# ==========================================\n"
         out += "# 1. TEMPLATE GRAPH\n"

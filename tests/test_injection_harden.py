@@ -59,14 +59,15 @@ def test_type_matching_forward_ref():
     assert isinstance(node, resolved_anno)
 
 def test_global_node_injection():
+    from skelantic.commons.nodes import RootNode
     reg = MagicMock()
     engine = LinterEngine(reg)
     
     # Register root node
-    root = DirectoryNode("abs_root", ".", engine.ctx)
+    root = RootNode("abs_root", ".", engine.ctx)
     engine.ctx.register_node(root)
     
-    def global_proc(node: DirectoryNode, tracer):
+    def global_proc(node: RootNode, tracer):
         if node and node.rel_path.as_posix() == ".":
             return ["root_found"]
         return ["fail"]
@@ -75,7 +76,7 @@ def test_global_node_injection():
     mock_b.phase = 3
     mock_b.func = global_proc
     mock_b.name = "global_proc"
-    mock_b.match = "root"
+    mock_b.match = None
     mock_b.regex = None
     
     reg.bindings = [mock_b]

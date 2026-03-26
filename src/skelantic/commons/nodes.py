@@ -89,6 +89,10 @@ class DirectoryNode(FSNode):
                     results.append(node)
         return results
 
+class RootNode(DirectoryNode):
+    """Repräsentiert den Wurzelknoten des Repositories."""
+    pass
+
 class FileNode(FSNode):
     """Repräsentiert eine geprüfte Datei und hält deren geparsten Inhalt."""
     def __init__(self, abs_path: str, rel_path: str, ctx: LinterContext):
