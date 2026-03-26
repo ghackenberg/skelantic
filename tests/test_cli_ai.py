@@ -12,20 +12,30 @@ from skelantic.cli import main
 def test_cli_init(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(sys, 'argv', ['skelantic', 'init'])
-    
+
     with patch('importlib.metadata.version', return_value='0.2.0'):
         with patch('skelantic.cli._get_pkg_data_path', return_value=pathlib.Path(os.getcwd())):
             pathlib.Path("SKILL.md").write_text("test skill")
             os.makedirs("docs")
             pathlib.Path("docs/info.md").write_text("info")
             main()
-            
+
     assert (tmp_path / ".skelantic/version").read_text() == "0.2.0"
     assert (tmp_path / ".skelantic/settings.yaml").exists()
-    assert (tmp_path / "tools/skelantic/processors").exists()
-    assert (tmp_path / "tools/skelantic/tests").exists()
+    assert (tmp_path / "tools/__init__.py").exists()
+    assert (tmp_path / "tools/skelantic/__init__.py").exists()
+    assert (tmp_path / "tools/skelantic/processors/__init__.py").exists()
+    assert (tmp_path / "tools/skelantic/tests/__init__.py").exists()
     assert (tmp_path / ".gemini/skills/skelantic/SKILL.md").exists()
 
+    # Verify pyproject.toml
+    pyproj = (tmp_path / "pyproject.toml").read_text()
+    assert 'dependencies = ["skelantic>=0.2.0"]' in pyproj
+
+    # Verify NO top-level src/tests
+    assert not (tmp_path / "src").exists()
+    # Note: the test environment has a 'tests' folder for our own tests, 
+    # but we are in tmp_path which should be empty.
 def test_cli_run_and_generate(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     os.makedirs(".skelantic")

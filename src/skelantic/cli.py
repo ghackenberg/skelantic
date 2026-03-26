@@ -246,20 +246,41 @@ def main() -> None:
 
         elif args.command == "init":
             # 1. Structure
-            for d in ["src", "tests", ".skelantic/templates", "tools/skelantic/processors", "tools/skelantic/tests"]:
+            init_dirs = [
+                ".skelantic/templates", 
+                "tools",
+                "tools/skelantic",
+                "tools/skelantic/processors", 
+                "tools/skelantic/tests"
+            ]
+            for d in init_dirs:
                 pathlib.Path(d).mkdir(parents=True, exist_ok=True)
+                # Create __init__.py in tools folders
+                if d.startswith("tools"):
+                    init_file = pathlib.Path(d) / "__init__.py"
+                    if not init_file.exists():
+                        init_file.touch()
             
             # 2. Configs
             c_file = pathlib.Path(".skelantic/config.yaml")
             if not c_file.exists():
                 c_file.write_text("description: 'Repository Root'\nfiles: {}\ndirectories: {}\n", encoding="utf-8")
                 
+            installed, _ = _get_versions()
+            
             pyproj = pathlib.Path("pyproject.toml")
             if not pyproj.exists():
-                pyproj.write_text("[tool.pyright]\ntypeCheckingMode = 'strict'\n\n[tool.pytest.ini_options]\naddopts = '--cov-fail-under=90'\n", encoding="utf-8")
+                content = "[project]\n"
+                content += "name = \"project-governed-by-skelantic\"\n"
+                content += "version = \"0.1.0\"\n"
+                content += f"dependencies = [\"skelantic>={installed}\"]\n\n"
+                content += "[tool.pyright]\n"
+                content += "typeCheckingMode = \"strict\"\n\n"
+                content += "[tool.pytest.ini_options]\n"
+                content += "addopts = \"--cov-fail-under=90\"\n"
+                pyproj.write_text(content, encoding="utf-8")
                 
             # 3. Settings & Version
-            installed, _ = _get_versions()
             pathlib.Path(".skelantic/version").write_text(installed, encoding="utf-8")
             _save_settings(settings)
             
