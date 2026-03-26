@@ -1,67 +1,94 @@
 # Command Line Interface (CLI) Reference
 
-The `skelantic` command-line tool is the primary way to interact with the framework. It provides commands to generate models, run the validation engine, and access documentation.
+The `skelantic` command-line tool is the primary way to interact with the framework. It is designed to be **AI-Native**, providing structured information for coding agents while enforcing strict repository governance.
+
+## Configuration & Settings
+
+Skelantic uses a settings file at `.skelantic/settings.yaml` to store default paths. If this file exists, most CLI arguments become optional.
+
+**Default Settings:**
+```yaml
+types_file: "tools/skelantic/types.py"
+types_module: "tools.skelantic.types"
+processors_package: "tools.skelantic.processors"
+```
+
+---
 
 ## `skelantic run`
 
-Executes the Skelantic workflow engine against your repository. It parses configuration files, matches files against templates, and executes your custom Python processor functions.
+Executes the Skelantic workflow engine. It validates the repository against the configuration and executes custom Python processor functions. **It always operates on the Current Working Directory (CWD).**
 
 **Usage:**
 ```bash
-skelantic run -p <processors_package> -t <types_module> [options]
+skelantic run [options]
 ```
 
 **Arguments:**
-* `-t`, `--types` **(Required)**: The Python module path where your generated `skelantic_types.py` is located (e.g., `tools.skelantic_types`).
-* `-p`, `--processors` (Optional): The Python package path containing your `@processor` functions (e.g., `tools.processors`). If provided, Skelantic will dynamically import all modules within this package to register the processors.
-* `-d`, `--dir` (Optional): The base directory to lint. Defaults to the current working directory (`.`).
-* `-v`, `--verbose` (Optional): Enables verbose output, which is helpful for debugging why a specific file was or was not matched.
+* `-v`, `--verbose`: Enables verbose matching logs.
 
 ---
 
 ## `skelantic generate`
 
-Parses your `.skelantic/templates/*.md` files and your `.skelantic/config.yaml` to automatically generate a single, strongly-typed "File System ORM" (`RepoGraph`). You should run this command whenever you change the structure of a Skeletal Template or your `config.yaml`.
+Parses your templates and `config.yaml` to generate the strongly-typed `RepoGraph` and Pydantic models.
 
 **Usage:**
 ```bash
-skelantic generate -o <output_file>
+skelantic generate [options]
 ```
 
 **Arguments:**
-* `-o`, `--output` **(Required)**: The file path where the generated Python code should be saved (e.g., `tools/skelantic_types.py`). This file will contain the `RepoGraph` and all Pydantic models.
+* `-v`, `--verbose`: Enables verbose matching logs.
+
+---
+
+## `skelantic init`
+
+Initializes a new Skelantic project. It creates the base folder structure, a default configuration, and deploys the **Gemini Skill** to `.gemini/skills/skelantic/`. It also generates the initial `.skelantic/settings.yaml`.
+
+**Usage:**
+```bash
+skelantic init
+```
 
 ---
 
 ## `skelantic migrate`
 
-Outputs strictly formatted XML prompts designed to guide AI coding agents through upgrading a target repository to a newer version of Skelantic. The command determines the repository's current version (from `.skelantic/version`) and reads the required migration steps bundled within the `skelantic` package.
+Updates the repository to the current Skelantic version. It refreshes the local Skill files and updates the `.skelantic/version` file.
 
 **Usage:**
 ```bash
-skelantic migrate [--from <version>]
+skelantic migrate
 ```
-
-**Arguments:**
-* `--from` (Optional): Manually specify the version to migrate from (e.g., `0.1.0`). If omitted, the command automatically reads the `.skelantic/version` file in the current directory.
 
 ---
 
-## `skelantic docs`
+## `skelantic info`
 
-A specialized command that prints the Skelantic framework documentation directly to your terminal. 
+The "Architecture Orakel". It virtually resolves a path against the schema (even if the file doesn't exist yet) and returns the required types, variables, and data schemas.
 
-This command is particularly powerful for **AI Coding Agents** (like Gemini, Claude, or Cursor). Because it reads the documentation directly from the installed Python package, it guarantees that the documentation perfectly matches the installed version of the framework.
-
-**Usage for Humans:**
+**Usage:**
 ```bash
-skelantic docs             # Lists all available documentation topics
-skelantic docs templates   # Prints the Skeletal Templates syntax guide
-skelantic docs config      # Prints the config.yaml guide
+skelantic info <path>
 ```
 
-**Usage for AI Agents:**
+---
+
+## `skelantic template`
+
+Returns the raw Skeletal Template content for a given target path.
+
+**Usage:**
 ```bash
-skelantic docs --all
+skelantic template <path>
 ```
-*The `--all` flag dumps the entire framework documentation (README, CLI, Config, Templates, Processors, Nodes) formatted with XML tags (`<document path="...">`). This is the recommended way to inject Skelantic's context into an LLM prompt.*
+
+---
+
+## 🛡️ Version Checking
+
+Skelantic automatically checks for version mismatches.
+* If your **Pip package** is older than the repository, it will prompt you to run `pip install --upgrade skelantic`.
+* If your **Repository** is older than the installed package, it will prompt you to run `skelantic migrate`.

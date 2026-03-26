@@ -1,5 +1,6 @@
 from typing import Callable, Any, List, Optional, Pattern
 import re
+import inspect
 from dataclasses import dataclass
 
 @dataclass
@@ -24,6 +25,15 @@ def processor(match: Optional[str] = None, phase: int = 2) -> Callable[[Callable
     :param phase: Ausführungs-Pass (1, 2, 3)
     """
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        if not func.__doc__ or not func.__doc__.strip():
+            try:
+                f_path = inspect.getfile(func)
+                _, line = inspect.getsourcelines(func)
+                loc = f" in '{f_path}:{line}'"
+            except Exception:
+                loc = ""
+            raise ValueError(f"Processor function '{func.__name__}'{loc} must have a docstring.")
+
         # Dynamisch erzeugter Name für Logging und Tracing
         name = f"{func.__module__}.{func.__name__}"
 

@@ -10,6 +10,7 @@ from .nodes import FileNode
 
 @processor(match="**/*.md", phase=2)
 def dead_link(node: FileNode) -> List[str]:
+    """Checks for broken relative links in markdown files."""
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return []

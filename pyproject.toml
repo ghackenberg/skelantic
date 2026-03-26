@@ -55,6 +55,7 @@ include = [
     "/src",
     "/docs",
     "/README.md",
+    "/SKILL.md",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -62,4 +63,5 @@ packages = ["src/skelantic"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "README.md" = "skelantic/_docs/README.md"
+"SKILL.md" = "skelantic/_docs/SKILL.md"
 "docs" = "skelantic/_docs/docs"

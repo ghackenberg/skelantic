@@ -16,10 +16,10 @@ To use a node in your processor, simply add it to your function signature. The S
 
 ```python
 from skelantic.commons.decorators import processor
-from skelantic.commons.nodes import FileNode
+from tools.skelantic_types import RepoGraph
 
-@processor(match="docs/**/*.md", phase=2)
-def check_markdown_files(node: FileNode) -> list[str]:
+@processor(phase=2)
+def check_markdown_files(node: RepoGraph.Docs.Issues.SlugMd) -> list[str]:
     # Work with the node here...
     return []
 ```

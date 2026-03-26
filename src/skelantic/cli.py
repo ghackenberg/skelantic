@@ -4,8 +4,83 @@ import sys
 import importlib
 import importlib.metadata
 import pkgutil
+import pathlib
+import shutil
+import yaml
+import inspect
+from typing import Dict, cast
 from skelantic.commons.core import LinterEngine
 from skelantic.commons.decorators import registry
+from skelantic.commons.resolver import PathResolver
+
+def _get_versions() -> tuple[str, str]:
+    try:
+        installed = importlib.metadata.version('skelantic')
+    except importlib.metadata.PackageNotFoundError:
+        installed = "0.0.0-dev"
+        
+    repo_version = "unknown"
+    v_file = pathlib.Path(".skelantic/version")
+    if v_file.exists():
+        repo_version = v_file.read_text(encoding="utf-8").strip()
+        
+    return installed, repo_version
+
+def _load_settings() -> Dict[str, str]:
+    settings = {
+        "types_file": "tools/skelantic/types.py",
+        "types_module": "tools.skelantic.types",
+        "processors_package": "tools.skelantic.processors",
+        "processors_dir": "tools/skelantic/processors"
+    }
+    s_file = pathlib.Path(".skelantic/settings.yaml")
+    if s_file.exists():
+        try:
+            with open(s_file, "r", encoding="utf-8") as f:
+                loaded = yaml.safe_load(f)
+                if isinstance(loaded, dict):
+                    settings.update(cast(Dict[str, str], loaded))
+        except Exception: pass
+    return settings
+
+def _save_settings(settings: Dict[str, str]) -> None:
+    pathlib.Path(".skelantic").mkdir(parents=True, exist_ok=True)
+    with open(".skelantic/settings.yaml", "w", encoding="utf-8") as f:
+        yaml.dump(settings, f, default_flow_style=False)
+
+def _check_version(command: str) -> None:
+    if command in ["init", "migrate", "info", "template"]:
+        return # Skip check for these commands or handle specifically
+        
+    installed, repo = _get_versions()
+    if repo == "unknown":
+        return # Probably not a skelantic project yet
+        
+    if installed != repo:
+        if installed < repo:
+            print(f"❌ ERROR: Your installed Skelantic version ({installed}) is older than the repository version ({repo}).")
+            print(f"👉 Please run: pip install --upgrade skelantic")
+            sys.exit(1)
+        else:
+            print(f"❌ ERROR: The repository is using an older version of Skelantic ({repo}). Installed is {installed}.")
+            print(f"👉 You MUST run 'skelantic migrate' to update the skill files and acknowledgment the upgrade.")
+            sys.exit(1)
+
+def _get_pkg_data_path() -> pathlib.Path:
+    cli_path = pathlib.Path(__file__).resolve()
+    pkg_root = cli_path.parent
+    
+    # 1. Try package data first (production/pip install)
+    data_root = pkg_root / "_docs"
+    if (data_root / "SKILL.md").exists():
+        return data_root
+        
+    # 2. Fallback to repository root (local development)
+    repo_root = cli_path.parent.parent.parent
+    if (repo_root / "SKILL.md").exists():
+        return repo_root
+        
+    raise Exception("Could not locate Skelantic data files (SKILL.md, docs/).")
 
 def main() -> None:
     if hasattr(sys.stdout, 'reconfigure'):
@@ -14,182 +89,232 @@ def main() -> None:
         except Exception:
             pass
 
-    parser = argparse.ArgumentParser(description="Skelantic - Declarative file-tree governance and automation.")
+    parser = argparse.ArgumentParser(description="Skelantic - AI-Native Repository Governance.")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
-    run_parser = subparsers.add_parser("run", help="Run the Skelantic linter/engine against a directory.")
-    run_parser.add_argument("-d", "--dir", default=".", help="The base directory to lint.")
+    # RUN
+    run_parser = subparsers.add_parser("run", help="Run the linter against the repository.")
     run_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output.")
-    run_parser.add_argument("-p", "--processors", default=None, help="The Python package containing the @processor functions (e.g. 'tools.skelantic.processors').")
-    run_parser.add_argument("-t", "--types", required=True, help="The Python module containing the generated types (e.g. 'tools.skelantic.types').")
 
-    gen_parser = subparsers.add_parser("generate", help="Generate Pydantic models from Skeletal Templates.")
-    gen_parser.add_argument("-o", "--output", required=True, help="Output file path for generated types (e.g. 'tools/skelantic/types.py').")
-    gen_parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output during generation.")
+    # GENERATE
+    gen_parser = subparsers.add_parser("generate", help="Generate RepoGraph types.")
+    gen_parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output.")
 
-    migrate_parser = subparsers.add_parser("migrate", help="Output AI-ready migration prompts for upgrading Skelantic.")
-    migrate_parser.add_argument("--from", dest="from_version", default=None, help="The version to migrate from (e.g., '0.1.0'). If omitted, reads from .skelantic/version.")
+    # INIT
+    subparsers.add_parser("init", help="Initialize a new Skelantic project.")
 
-    docs_parser = subparsers.add_parser("docs", help="Print Skelantic documentation (useful for AI Agents).")
-    docs_parser.add_argument("topic", nargs="?", default=None, help="The documentation topic to print (e.g. 'templates'). If omitted, prints a summary.")
-    docs_parser.add_argument("--all", action="store_true", help="Print all documentation in an XML-tagged format for AI agents.")
+    # MIGRATE
+    subparsers.add_parser("migrate", help="Update repository to match installed Skelantic version.")
+
+    # INFO
+    info_parser = subparsers.add_parser("info", help="Inspect a path against the schema.")
+    info_parser.add_argument("path", help="The path to inspect.")
+
+    # TEMPLATE
+    tmpl_parser = subparsers.add_parser("template", help="Get the raw template for a path.")
+    tmpl_parser.add_argument("path", help="The path to resolve.")
 
     args = parser.parse_args()
+    if not args.command:
+        parser.print_help()
+        return
+
+    _check_version(args.command)
+    settings = _load_settings()
 
     if args.command == "run":
-        sys.path.insert(0, os.getcwd()) # Ensure local packages can be imported
-        if args.processors:
+        sys.path.insert(0, os.getcwd())
+        processors_pkg = settings.get("processors_package")
+        types_mod_name = settings.get("types_module")
+        
+        if not types_mod_name:
+            print("❌ ERROR: 'types_module' is not defined in .skelantic/settings.yaml")
+            sys.exit(1)
+
+        if processors_pkg:
             try:
-                proc_module = importlib.import_module(args.processors)
+                proc_module = importlib.import_module(processors_pkg)
                 if hasattr(proc_module, '__path__'):
                     for _, module_name, _ in pkgutil.iter_modules(proc_module.__path__): # type: ignore
-                        importlib.import_module(f"{args.processors}.{module_name}")
-                else:
-                    print(f"Warning: The processors module '{args.processors}' does not seem to be a package. Imports might not be complete.")
+                        importlib.import_module(f"{processors_pkg}.{module_name}")
             except ImportError as e:
-                print(f"Error importing processors module '{args.processors}': {e}")
-                sys.exit(1)
+                print(f"Error importing processors: {e}"); sys.exit(1)
 
         types_module = None
-        if args.types:
-            try:
-                types_module = importlib.import_module(args.types)
-            except ImportError as e:
-                print(f"Error importing types module '{args.types}': {e}")
-                sys.exit(1)
+        try:
+            types_module = importlib.import_module(types_mod_name)
+        except ImportError as e:
+            print(f"Error importing types: {e}"); sys.exit(1)
 
         engine = LinterEngine(registry, verbose=args.verbose, types_module=types_module)
-        engine.run(args.dir)
-        failed = engine.print_report()
-        if failed:
-            sys.exit(1)
+        engine.run(".")
+        if engine.print_report(): sys.exit(1)
 
     elif args.command == "generate":
         from skelantic.commons.codegen import run_codegen
-        config_path = os.path.join(".", ".skelantic", "config.yaml")
-        run_codegen(config_path=config_path, output_path=args.output, verbose=args.verbose)
-
-    elif args.command == "migrate":
-        import pathlib
-        
-        try:
-            current_version = importlib.metadata.version('skelantic')
-        except importlib.metadata.PackageNotFoundError:
-            current_version = "unknown"
-            
-        from_version = args.from_version
-        
-        if not from_version:
-            version_file = pathlib.Path(".skelantic/version")
-            if version_file.exists():
-                from_version = version_file.read_text(encoding="utf-8").strip()
-            else:
-                from_version = "0.1.x"
-                print(f"Warning: Could not find .skelantic/version file. Assuming starting version is {from_version}.\n")
-                
-        cli_path = pathlib.Path(__file__).resolve()
-        pkg_root = cli_path.parent
-        
-        # 1. Try package data first (production/pip install)
-        migrations_dir = pkg_root / "_docs" / "docs" / "migrations"
-        
-        # 2. Fallback to repository root (local development)
-        if not migrations_dir.exists() or not migrations_dir.is_dir():
-            migrations_dir = cli_path.parent.parent.parent / "docs" / "migrations"
-            
-        if not migrations_dir.exists():
-            print("No migrations found in the Skelantic installation.")
-            sys.exit(0)
-            
-        migration_files = sorted(migrations_dir.glob("*.md"))
-        
-        print("<system_instruction>")
-        print(f"You are upgrading a Skelantic repository from v{from_version} to v{current_version}.")
-        print("Apply the following refactoring steps sequentially:")
-        print("</system_instruction>\n")
-        
-        for m_file in migration_files:
-            print(f'<migration file="{m_file.name}">')
-            print(m_file.read_text(encoding="utf-8"))
-            print("</migration>\n")
-            
-        print("<system_instruction>")
-        print("Once the refactoring is complete, run your skelantic generate command to update the types and the .skelantic/version file.")
-        print("</system_instruction>")
-
-    elif args.command == "docs":
-        import pathlib
-        
-        def get_docs_base_path() -> pathlib.Path | None:
-            cli_path = pathlib.Path(__file__).resolve()
-            pkg_root = cli_path.parent
-            
-            # 1. Try package data first (production/pip install)
-            docs_root = pkg_root / "_docs"
-            if (docs_root / "README.md").exists() and (docs_root / "docs").is_dir():
-                return docs_root
-                
-            # 2. Fallback to repository root (local development)
-            repo_root = cli_path.parent.parent.parent
-            if (repo_root / "README.md").exists() and (repo_root / "docs").is_dir():
-                return repo_root
-                
-            return None
-            
-        base_path = get_docs_base_path()
-        if not base_path:
-            print("Error: Could not locate Skelantic documentation files.")
+        output_path = settings.get("types_file")
+        if not output_path:
+            print("❌ ERROR: 'types_file' is not defined in .skelantic/settings.yaml")
             sys.exit(1)
             
-        doc_files: list[tuple[str, str, str]] = [
-            ("readme", "README.md", "High-Level Overview, Quickstart and Philosophy"),
-            ("cli", "docs/cli.md", "Command Line Interface (CLI) Reference"),
-            ("config", "docs/config.md", "Configuration Guide (config.yaml)"),
-            ("templates", "docs/templates.md", "Skeletal Templates Syntax Guide"),
-            ("processors", "docs/processors.md", "Writing Processors & Understanding Context"),
-            ("nodes", "docs/nodes.md", "File System Nodes API"),
-        ]
-        
-        if args.all:
-            print("<skelantic_documentation>\n")
-            for _, rel_path, desc in doc_files:
-                p = base_path / rel_path
-                if p.exists():
-                    print(f'<document path="{rel_path}" description="{desc}">')
-                    print(p.read_text(encoding="utf-8"))
-                    print("</document>\n")
-                else:
-                    print(f'<!-- Warning: Document {rel_path} not found -->\n')
-            print("</skelantic_documentation>")
-            
-        elif args.topic:
-            topic = args.topic.lower()
-            found = False
-            for t, rel_path, desc in doc_files:
-                if t == topic or (topic.endswith(".md") and rel_path.endswith(topic)):
-                    p = base_path / rel_path
-                    if p.exists():
-                        print(p.read_text(encoding="utf-8"))
-                    else:
-                        print(f"Error: Documentation file {rel_path} not found.")
-                    found = True
-                    break
-            if not found:
-                print(f"Error: Topic '{topic}' not found. Available topics: {', '.join(t[0] for t in doc_files)}")
-                sys.exit(1)
-                
-        else:
-            print("Skelantic Documentation")
-            print("-----------------------")
-            print("Available topics:")
-            for topic, rel_path, desc in doc_files:
-                print(f"  {topic:<15} - {desc}")
-            print("\nUsage:")
-            print("  skelantic docs <topic>   # Read specific topic")
-            print("  skelantic docs --all     # Dump all docs for AI Agents")
+        config_path = os.path.join(".", ".skelantic", "config.yaml")
+        run_codegen(config_path=config_path, output_path=output_path, verbose=args.verbose)
 
-    else:
-        parser.print_help()
+    elif args.command == "init":
+        # 1. Structure
+        for d in ["src", "tests", ".skelantic/templates", "tools/skelantic/processors"]:
+            pathlib.Path(d).mkdir(parents=True, exist_ok=True)
+        
+        # 2. Configs
+        c_file = pathlib.Path(".skelantic/config.yaml")
+        if not c_file.exists():
+            c_file.write_text("description: 'Repository Root'\nfiles: {}\ndirectories: {}\n", encoding="utf-8")
+            
+        pyproj = pathlib.Path("pyproject.toml")
+        if not pyproj.exists():
+            pyproj.write_text("[tool.pyright]\ntypeCheckingMode = 'strict'\n\n[tool.pytest.ini_options]\naddopts = '--cov=src --cov-report=term-missing --cov-fail-under=90'\n", encoding="utf-8")
+            
+        # 3. Settings & Version
+        installed, _ = _get_versions()
+        pathlib.Path(".skelantic/version").write_text(installed, encoding="utf-8")
+        _save_settings(settings)
+        
+        # 4. Skill
+        _deploy_skill()
+        print(f"✅ Project initialized with Skelantic {installed}.")
+        print(f"🚀 Skill deployed to .gemini/skills/skelantic/")
+        print(f"⚙️ Settings saved to .skelantic/settings.yaml")
+
+    elif args.command == "migrate":
+        installed, _ = _get_versions()
+        pathlib.Path(".skelantic").mkdir(parents=True, exist_ok=True)
+        pathlib.Path(".skelantic/version").write_text(installed, encoding="utf-8")
+        if not pathlib.Path(".skelantic/settings.yaml").exists():
+            _save_settings(settings)
+        _deploy_skill()
+        print(f"✅ Repository migrated to Skelantic {installed}.")
+        print(f"📜 Please read the migration docs in .gemini/skills/skelantic/docs/migrations/ for refactoring steps.")
+
+    elif args.command == "info" or args.command == "template":
+        sys.path.insert(0, os.getcwd())
+        types_mod_name = settings.get("types_module")
+        if not types_mod_name:
+            print("❌ ERROR: 'types_module' is not defined in .skelantic/settings.yaml")
+            sys.exit(1)
+            
+        try:
+            types_module = importlib.import_module(types_mod_name)
+            node_map = getattr(types_module, "__SKELANTIC_NODE_MAP__", {})
+        except Exception as e:
+            print(f"Error loading types: {e}"); sys.exit(1)
+            
+        resolver = PathResolver(node_map)
+        res = resolver.resolve(args.path)
+        
+        if not res:
+            print(f"❌ Path '{args.path}' does not match any pattern in the configuration.")
+            sys.exit(1)
+            
+        if args.command == "info":
+            print(f"Path:   {args.path}")
+            print(f"Status: {'✅ MATCHED' if res.exists else '👻 SCHEMA MATCH (File does not exist yet)'}")
+            print("-" * 50)
+            print("--- Configuration State ---")
+            print(f"Full Match Path:    {res.match_path}")
+            print(f"Parent Folder Path: {res.parent_folder}")
+            print(f"Description:        {res.config.get('description', 'N/A')}")
+            print(f"Ignore:             {res.config.get('ignore', False)}")
+            print(f"Optional:           {res.config.get('optional', False)}")
+            print(f"Silent:             {res.config.get('silent', False)}")
+            print(f"Template File:      {res.template_path or 'None'}")
+            print("\n--- Python Injection Interface ---")
+            print(f"Node Type:   {res.node_type or 'N/A'}")
+            print(f"Parent Type: {res.parent_type or 'N/A'}")
+            print("\nPath Variables (node.path_params):")
+            for k, v in res.path_params.items():
+                print(f"  {k}: {v}")
+            
+            # Extract template fields if exists
+            if res.template_path and os.path.exists(res.template_path):
+                from skelantic.templates.matcher import SkeletalMatcher
+                from skelantic.templates.parser import LineNode
+                try:
+                    with open(res.template_path, 'r', encoding='utf-8') as tf:
+                        m = SkeletalMatcher(tf.read())
+                        # Flatten data structure
+                        print("\nTemplate Data (node.data):")
+                        # This is a bit complex without instantiating the Pydantic model, 
+                        # but we can try to list variables from the parser.
+                        for n in m.parser.parse():
+                            if isinstance(n, LineNode):
+                                for var_item in n.variables:
+                                    print(f"  {var_item.name}: {var_item.var_type}")
+                except: pass
+            
+            # --- Active Processors ---
+            print("\n--- Active Processors for this Path ---")
+            found_procs = False
+            for binding in registry.bindings:
+                # Check if it matches this path
+                is_match = False
+                if binding.match == "root" and args.path == ".": is_match = True
+                elif binding.regex and binding.regex.match(args.path): is_match = True
+                
+                # Check if type matches (very basic string check for now)
+                # In a real scenario we'd do deeper introspection
+                
+                if is_match:
+                    found_procs = True
+                    f_file = inspect.getfile(binding.func)
+                    # Make path relative to repo root
+                    try:
+                        f_file = os.path.relpath(f_file, os.getcwd())
+                    except: pass
+                    
+                    doc = (binding.func.__doc__ or "No docstring.").strip().split('\n')[0]
+                    print(f"- Function: {binding.func.__name__} (Phase {binding.phase})")
+                    print(f"  File:     {f_file}")
+                    print(f"  Doc:      \"{doc}\"")
+            
+            if not found_procs:
+                print("None.")
+                
+            if res.is_directory:
+                print("\n--- Allowed Children (Navigation) ---")
+                print("📁 Folders:")
+                for d in sorted(res.allowed_child_dirs): print(f"  - {d}")
+                print("📄 Files:")
+                for f in sorted(res.allowed_child_files): print(f"  - {f}")
+        else:
+            # template command
+            if not res.template_path:
+                print(f"❌ No template defined for path '{args.path}'.")
+                sys.exit(1)
+            print(f"Template File: {res.template_path}")
+            print("-" * 50)
+            try:
+                with open(res.template_path, 'r', encoding='utf-8') as f:
+                    print(f.read())
+            except Exception as e:
+                print(f"Error reading template: {e}"); sys.exit(1)
+
+def _deploy_skill() -> None:
+    try:
+        data_path = _get_pkg_data_path()
+        dest = pathlib.Path(".gemini/skills/skelantic")
+        if dest.exists():
+            shutil.rmtree(dest)
+        dest.mkdir(parents=True, exist_ok=True)
+        
+        # Copy SKILL.md
+        shutil.copy(data_path / "SKILL.md", dest / "SKILL.md")
+        
+        # Copy docs/
+        docs_src = data_path / "docs"
+        if docs_src.exists():
+            shutil.copytree(docs_src, dest / "docs")
+    except Exception as e:
+        print(f"Warning: Could not deploy skill files: {e}")
 
 if __name__ == "__main__":
     main()
