@@ -35,7 +35,8 @@ When a validation fails or you need to write a new one:
 After every task, execute this sequence:
 1. `skelantic generate` (Updates the types)
 2. `skelantic run` (Validates the repo)
-3. Fix all reported `❌ Unerlaubte Datei` or `❌ Syntax-Fehler`.
+3. If errors occur, run `skelantic run -v` to see the detailed execution traces from the processors.
+4. Fix all reported `❌ Unerlaubte Datei` or `❌ Syntax-Fehler`.
 
 ## 📚 Detailed Documentation
 For deep dives into syntax, read these local files using your `read_file` tool:

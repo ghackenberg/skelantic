@@ -49,7 +49,7 @@ def test_cli_run_and_generate(tmp_path, monkeypatch, capsys):
         # Test Run
         pathlib.Path("tools").mkdir()
         pathlib.Path("tools/__init__.py").touch()
-        pathlib.Path("tools/procs.py").write_text("from skelantic.commons.decorators import processor\n@processor(phase=1)\ndef p(node):\n    \"\"\"My Doc\"\"\"\n    return []")
+        pathlib.Path("tools/procs.py").write_text("from skelantic.commons.decorators import processor\n@processor(phase=1)\ndef p(node, tracer):\n    \"\"\"My Doc\"\"\"\n    return []")
         
         mock_types = MagicMock()
         with patch('importlib.import_module', return_value=mock_types):
@@ -78,7 +78,7 @@ def test_cli_info_with_processors(tmp_path, monkeypatch, capsys):
     # Clear registry for clean test
     registry.bindings = []
     
-    def my_test_proc(node):
+    def my_test_proc(node, tracer):
         """Validates the test file."""
         return []
     
@@ -131,7 +131,7 @@ def test_cli_errors_missing_settings(tmp_path, monkeypatch, capsys):
 
 def test_processor_docstring_enforcement():
     from skelantic.commons.decorators import processor
-    def p_no_doc(node): return []
+    def p_no_doc(node, tracer): return []
     with pytest.raises(ValueError) as exc:
         processor()(p_no_doc)
     assert "must have a docstring" in str(exc.value)
@@ -139,7 +139,7 @@ def test_processor_docstring_enforcement():
 
 def test_processor_docstring_enforcement_inspect_fail():
     from skelantic.commons.decorators import processor
-    def p_no_doc(node): return []
+    def p_no_doc(node, tracer): return []
     with patch('inspect.getfile', side_effect=Exception("fail")):
         with pytest.raises(ValueError) as exc:
             processor()(p_no_doc)
@@ -218,7 +218,7 @@ def test_cli_info_with_string_annotation(tmp_path, monkeypatch, capsys):
     registry.bindings = []
     
     # Use string annotation "TestMd"
-    def my_string_proc(node: "TestMd"):
+    def my_string_proc(node: "TestMd", tracer):
         """Doc string for eval test."""
         return []
     

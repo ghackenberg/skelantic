@@ -184,6 +184,7 @@ class LinterEngine:
         current_traces: List[str] = []
         def tracer(msg: str) -> None:
             current_traces.append(msg)
+            if self.verbose: print(f"   [TRACE] {msg}")
 
         for param_name, param in sig.parameters.items():
             if hasattr(param.annotation, '__mro__') and issubclass(param.annotation, BaseModel):

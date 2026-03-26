@@ -121,7 +121,7 @@ def test_cli_processors_with_registry(tmp_path, monkeypatch, capsys):
     with open(tmp_path / ".skelantic/settings.yaml", "w") as f:
         yaml.dump({"types_module": "types"}, f)
         
-    def my_test_proc(node):
+    def my_test_proc(node, tracer):
         """Test Docstring"""
         return []
     

@@ -1,6 +1,6 @@
 import re
 import os
-from typing import List, Set, cast
+from typing import List, Set, cast, Callable
 from pydantic import BaseModel, Field
 from .decorators import processor
 from .nodes import FileNode, MarkdownNode
@@ -15,8 +15,9 @@ class GlobalMetadataState(BaseModel):
 # --- CORE LINTER RULES ---
 
 @processor(match="**/*.md", phase=2)
-def dead_link(node: MarkdownNode) -> List[str]:
+def dead_link(node: MarkdownNode, tracer: Callable[[str], None]) -> List[str]:
     """Prüft auf tote relative Links in Markdown-Dateien."""
+    tracer(f"Prüfe Links in {node.rel_path}")
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return []
@@ -31,13 +32,15 @@ def dead_link(node: MarkdownNode) -> List[str]:
         target_abs_path = (node.abs_path.parent / link_path).resolve()
         
         if not target_abs_path.exists():
+            tracer(f"Toter Link gefunden: {link}")
             errors.append(f"Toter Link: Der Verweis auf '{link}' kann nicht aufgelöst werden, da das Ziel nicht existiert. Bitte korrigiere den Pfad oder erstelle die fehlende Datei.")
 
     return errors
 
 @processor(match="**/*.md", phase=1)
-def build_document_graph(node: MarkdownNode, state: GlobalMetadataState) -> None:
+def build_document_graph(node: MarkdownNode, state: GlobalMetadataState, tracer: Callable[[str], None]) -> None:
     """Indexiert alle Markdown-Dateien und deren Verknüpfungen für die globale Konsistenzprüfung."""
+    tracer(f"Indexiere {node.rel_path}")
     rel_path = node.rel_path.as_posix()
     if ".templates" in rel_path or "linter/templates" in rel_path:
         return
@@ -56,8 +59,9 @@ def build_document_graph(node: MarkdownNode, state: GlobalMetadataState) -> None
         state.referenced_markdown_files.add(target_abs_path.as_posix())
 
 @processor(match="root", phase=3)
-def check_orphaned_documents(state: GlobalMetadataState) -> List[str]:
+def check_orphaned_documents(state: GlobalMetadataState, tracer: Callable[[str], None]) -> List[str]:
     """Identifiziert Dateien, die im Repository existieren, aber von keiner anderen Datei verlinkt werden."""
+    tracer("Suche nach verwaisten Dokumenten")
     warnings: List[str] = []
 
     orphans = state.all_markdown_files - state.referenced_markdown_files
@@ -65,14 +69,16 @@ def check_orphaned_documents(state: GlobalMetadataState) -> List[str]:
     for orphan in sorted(list(orphans)):
         try:
             pretty_path = os.path.relpath(orphan, os.getcwd()).replace('\\', '/')
+            tracer(f"Verwaiste Datei gefunden: {pretty_path}")
             warnings.append(f"Verwaistes Dokument: Die Datei '{pretty_path}' wird nirgendwo im Repository referenziert. Bitte füge einen Link zu dieser Datei hinzu (z.B. in der README.md des Ordners) oder lösche sie, falls sie obsolet ist.")
         except: pass
 
     return warnings
 
 @processor(match="**/*.md", phase=2)
-def backlink_enforcement(node: MarkdownNode) -> List[str]:
+def backlink_enforcement(node: MarkdownNode, tracer: Callable[[str], None]) -> List[str]:
     """Erzwingt eine saubere Navigationsstruktur durch verpflichtende Backlinks zur nächsten README.md."""    
+    tracer(f"Prüfe Backlink-Erzwingung für {node.rel_path}")
     rel_path = node.rel_path.as_posix()
     filename = node.name
 
@@ -106,8 +112,10 @@ def backlink_enforcement(node: MarkdownNode) -> List[str]:
         search_dir = os.path.dirname(search_dir)
 
     if not target_rel_path:
+        tracer("Keine übergeordnete README.md gefunden, überspringe Prüfung.")
         return []
 
+    tracer(f"Erwarte Backlink auf {target_repo_path}")
     raw = node.document.raw_content
     lines = raw.splitlines()
 
@@ -134,6 +142,7 @@ def backlink_enforcement(node: MarkdownNode) -> List[str]:
     pattern = rf'\[.*\]\({regex_path}\)'
 
     if not re.search(pattern, search_block):
+        tracer("Backlink nicht am Dateianfang gefunden.")
         loc = "direkt nach dem Frontmatter" if is_marp else "am Dateianfang (in den ersten 5 Zeilen)"
         return [
             f"Strukturfehler: Diese Datei muss einen Backlink zur übergeordneten Dokumentation '{target_repo_path}' enthalten.",
@@ -141,5 +150,3 @@ def backlink_enforcement(node: MarkdownNode) -> List[str]:
         ]
 
     return []
-
-

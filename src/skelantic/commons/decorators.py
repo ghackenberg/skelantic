@@ -25,6 +25,16 @@ def processor(match: Optional[str] = None, phase: int = 2) -> Callable[[Callable
     :param phase: Ausführungs-Pass (1, 2, 3)
     """
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        sig = inspect.signature(func)
+        if 'tracer' not in sig.parameters:
+            try:
+                f_path = inspect.getfile(func)
+                _, line = inspect.getsourcelines(func)
+                loc = f" in '{f_path}:{line}'"
+            except Exception:
+                loc = ""
+            raise ValueError(f"Processor function '{func.__name__}'{loc} must accept a 'tracer' parameter (usually 'tracer: Callable[[str], None]').")
+
         if not func.__doc__ or not func.__doc__.strip():
             try:
                 f_path = inspect.getfile(func)

@@ -17,7 +17,7 @@ def test_dead_link(tmp_path):
     from skelantic.commons.documents import MarkdownDocument
     mock_node.document = MarkdownDocument(str(doc_path))
     
-    res = dead_link(mock_node)
+    res = dead_link(mock_node, lambda x: None)
     assert len(res) == 1
     assert "Toter Link" in res[0]
 
@@ -34,7 +34,7 @@ def test_build_document_graph(tmp_path):
     mock_node.document = MarkdownDocument(str(doc_path))
     
     state = GlobalMetadataState()
-    build_document_graph(mock_node, state)
+    build_document_graph(mock_node, state, lambda x: None)
     
     assert str(doc_path.as_posix()) in state.all_markdown_files
     
@@ -45,7 +45,7 @@ def test_build_document_graph(tmp_path):
     mock_doc = Mock()
     mock_doc.get_links.return_value = []
     readme_node.document = mock_doc
-    build_document_graph(readme_node, state)
+    build_document_graph(readme_node, state, lambda x: None)
     assert str((tmp_path / "README.md").as_posix()) not in state.all_markdown_files
     # Link-Extraktion
     target_abs = (tmp_path / "target.md").resolve().as_posix()
@@ -57,7 +57,7 @@ def test_check_orphaned_documents():
     state.all_markdown_files = {"/a.md", "/b.md"}
     state.referenced_markdown_files = {"/a.md"}
     
-    res = check_orphaned_documents(state)
+    res = check_orphaned_documents(state, lambda x: None)
     assert len(res) == 1
     assert "b.md" in res[0]
 
@@ -81,7 +81,7 @@ def test_backlink_enforcement(tmp_path):
     mock_node.document = MarkdownDocument(str(doc))
     
     # Sollte Fehler melden
-    res = backlink_enforcement(mock_node)
+    res = backlink_enforcement(mock_node, lambda x: None)
     assert len(res) == 2
     assert "Strukturfehler" in res[0]
     assert "Handlungsempfehlung" in res[1]
@@ -89,7 +89,7 @@ def test_backlink_enforcement(tmp_path):
     # Mit korrektem Backlink
     doc.write_text("[Back](../README.md)\n# File")
     mock_node.document = MarkdownDocument(str(doc))
-    res = backlink_enforcement(mock_node)
+    res = backlink_enforcement(mock_node, lambda x: None)
     assert res == []
 
 def test_backlink_enforcement_marp(tmp_path):
@@ -106,7 +106,7 @@ def test_backlink_enforcement_marp(tmp_path):
     from skelantic.commons.documents import MarkdownDocument
     mock_node.document = MarkdownDocument(str(doc))
     
-    res = backlink_enforcement(mock_node)
+    res = backlink_enforcement(mock_node, lambda x: None)
     assert res == []
 
 def test_backlink_enforcement_multi_level(tmp_path):
@@ -128,7 +128,7 @@ def test_backlink_enforcement_multi_level(tmp_path):
     
     # Sollte Root README finden
     with patch("os.path.exists", side_effect=lambda x: str(tmp_path / "README.md") in x.replace('\\', '/')):
-        res = backlink_enforcement(mock_node)
+        res = backlink_enforcement(mock_node, lambda x: None)
         assert res == []
 
 def test_check_orphaned_documents_error():
@@ -137,7 +137,7 @@ def test_check_orphaned_documents_error():
     state.all_markdown_files = {"/invalid/path.md"}
     # os.path.relpath will fail if path is invalid or on different drive
     with patch("os.path.relpath", side_effect=ValueError):
-        res = check_orphaned_documents(state)
+        res = check_orphaned_documents(state, lambda x: None)
         assert res == []
 
 def test_check_orphaned_documents_success():
@@ -145,7 +145,7 @@ def test_check_orphaned_documents_success():
     state = GlobalMetadataState()
     state.all_markdown_files = {"/a/b/test.md"}
     with patch("os.path.relpath", return_value="a/b/test.md"):
-        res = check_orphaned_documents(state)
+        res = check_orphaned_documents(state, lambda x: None)
         assert len(res) == 1
         assert "a/b/test.md" in res[0]
 
@@ -153,7 +153,7 @@ def test_dead_link_ignore_templates(tmp_path):
     """Prüft, ob Templates ignoriert werden."""
     mock_node = Mock(spec=MarkdownNode)
     mock_node.rel_path = Path(".templates/test.md")
-    assert dead_link(mock_node) == []
+    assert dead_link(mock_node, lambda x: None) == []
 
 def test_dead_link_empty_path(tmp_path):
     """Prüft leere Link-Pfade."""
@@ -163,4 +163,4 @@ def test_dead_link_empty_path(tmp_path):
     mock_node.rel_path = Path("test.md")
     from skelantic.commons.documents import MarkdownDocument
     mock_node.document = MarkdownDocument(str(doc_path))
-    assert dead_link(mock_node) == []
+    assert dead_link(mock_node, lambda x: None) == []

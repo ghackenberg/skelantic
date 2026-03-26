@@ -231,7 +231,7 @@ def test_execute_rule_success_and_crash() -> None:
     assert any("warning 1" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
     
     # Test crash
-    def crash_rule() -> None:
+    def crash_rule(node: Any, tracer: Any) -> None:
         raise ValueError("boom")
         
     engine._execute_rule(crash_rule, "crash_rule", node, f_data)

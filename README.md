@@ -113,7 +113,7 @@ from tools.skelantic_types import RepoGraph
 
 # 2. Skelantic executes this processor ONLY for files matching this type!
 @processor(phase=2)
-def validate_issue_status(node: RepoGraph.Docs.Issues.SlugMd, tracer: Callable[[str], None] = lambda x: None) -> List[str]:
+def validate_issue_status(node: RepoGraph.Docs.Issues.SlugMd, tracer: Callable[[str], None]) -> List[str]:
     tracer(f"Validating issue: {node.rel_path.name}")
 
     # 3. Access path variables and template data 100% type-safely!
