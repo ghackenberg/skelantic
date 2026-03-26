@@ -184,9 +184,8 @@ def test_run_templates_match_failure(tmp_path: Any) -> None:
         instance.match.return_value = (False, ["error1"], {})
         instance.trace_log = ["trace1"]
         engine._run_templates(files_data)
-        assert engine.total_errors == 2
+        assert engine.total_errors == 3
         assert any("error1" in e['msg'] for e in engine.results_tree["file.md"]["_errors"])
-
 def test_run_phase(tmp_path: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
     file_path = tmp_path / "test.md"

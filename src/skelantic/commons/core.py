@@ -82,7 +82,10 @@ class LinterEngine:
                         trace_file = os.path.join(trace_dir, f"template_{safe_path}.log")
                         with open(trace_file, "w", encoding="utf-8") as f:
                             f.write("\n".join(matcher.trace_log))
-                        errs.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
+                        
+                        rel_trace_p = os.path.relpath(trace_file, os.getcwd())
+                        errs.append(f"Struktur-Fehler: Die Datei entspricht nicht dem Skeletal Template.")
+                        errs.append(f"💡 Analyse-Hilfe: Öffne die Log-Datei '{rel_trace_p}', um genau zu sehen, in welcher Zeile der Matcher gescheitert ist und was er stattdessen erwartet hat.")
                         self._add_results("ERROR", f_data['rel_path'], errs)
                     else:
                         self.ctx.extracted_data[f_data['rel_path']] = data
