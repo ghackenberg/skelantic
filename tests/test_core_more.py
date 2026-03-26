@@ -14,7 +14,7 @@ def test_execute_rule_with_traces(tmp_path):
     
     engine._execute_rule(rule_with_trace, "my_rule", node, f_data)
     
-    assert engine.total_errors == 2
+    assert engine.total_errors == 1
     # Check if trace log was written
     trace_dir = tmp_path / ".skelantic" / "traces"
     # Wait, the engine writes to os.getcwd(), so we should mock os.getcwd
@@ -31,9 +31,10 @@ def test_execute_rule_tracing(mock_getcwd, tmp_path):
         
     f_data = {"rel_path": "path/to/test.md"}
     engine._execute_rule(rule_with_trace, "my_rule", node, f_data)
-    
-    trace_file = tmp_path / ".skelantic" / "traces" / "my_rule_path_to_test.md.log"
+
+    trace_file = tmp_path / ".skelantic" / "traces" / "my_rule_path_to_test_md.log"
     assert trace_file.exists()
+
     assert trace_file.read_text() == "Trace step A"
 
 def test_execute_rule_unsupported_arg():

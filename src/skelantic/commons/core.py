@@ -84,9 +84,9 @@ class LinterEngine:
                             f.write("\n".join(matcher.trace_log))
                         
                         rel_trace_p = os.path.relpath(trace_file, os.getcwd())
-                        errs.append(f"Struktur-Fehler: Die Datei entspricht nicht dem Skeletal Template.")
-                        errs.append(f"💡 Analyse-Hilfe: Öffne die Log-Datei '{rel_trace_p}', um genau zu sehen, in welcher Zeile der Matcher gescheitert ist und was er stattdessen erwartet hat.")
+                        self._add_results("ERROR", f_data['rel_path'], [f"Struktur-Fehler: Die Datei entspricht nicht dem Skeletal Template."])
                         self._add_results("ERROR", f_data['rel_path'], errs)
+                        self._add_results("INFO", f_data['rel_path'], [f"💡 Analyse-Hilfe: Öffne die Log-Datei '{rel_trace_p}', um genau zu sehen, in welcher Zeile der Matcher gescheitert ist und was er stattdessen erwartet hat."])
                     else:
                         self.ctx.extracted_data[f_data['rel_path']] = data
                 except Exception as e: self._add_results("ERROR", f_data['rel_path'], [f"Template Error: {e}"])
@@ -241,89 +241,104 @@ class LinterEngine:
             }
         except Exception: pass
 
+        findings: List[str] = []
+        crashed = False
         try:
-            res = func(**kwargs)
-            if res:
-                # Determince if it's a global check based on node path
-                is_global = (node.rel_path.as_posix() == "." if node and hasattr(node, 'rel_path') else (f_data is None))
-                severity = "WARNING" if is_global else "ERROR"
-                target_path = f_data['rel_path'] if f_data else "root"
-
-                if current_traces:
-
-                    safe_path = target_path.replace('/', '_').replace('\\', '_')
-                    trace_dir = os.path.join(os.getcwd(), ".skelantic", "traces")
-                    os.makedirs(trace_dir, exist_ok=True)
-                    trace_file = os.path.join(trace_dir, f"{rule_name}_{safe_path}.log")
-                    with open(trace_file, "w", encoding="utf-8") as f:
-                        f.write("\n".join(current_traces))
-                    res.append(f"💡 Trace-Details gespeichert in: {os.path.relpath(trace_file, os.getcwd())}")
-                
-                self._add_results(severity, target_path, res, origin=origin)
-            return res or []
+            res_val = func(**kwargs)
+            findings = list(res_val) if res_val is not None else []
         except Exception as e:
-            # Check if it's a global check for prefix
-            is_global = (node.rel_path.as_posix() == "." if node and hasattr(node, 'rel_path') else False)
+            # Determine if it's a global check for prefix
+            is_global = (f_data.get('rel_path') == "." if f_data else False)
             prefix = "Global " if is_global else ""
-            self._add_results("ERROR", f_data['rel_path'] if f_data else "root", [f"{prefix}Crash '{rule_name}': {e}"], origin=origin)
-            return []
+            findings = [f"{prefix}Crash '{rule_name}': {e}"]
+            crashed = True
+        finally:
+            target_path = f_data.get('rel_path', 'root') if f_data else "root"
+            
+            # 1. ALWAYS write trace logs if they exist
+            if current_traces:
+                import re as regex_mod
+                safe_path = regex_mod.sub(r'[^a-zA-Z0-9_-]', '_', target_path)
+                trace_dir = os.path.join(os.getcwd(), ".skelantic", "traces")
+                os.makedirs(trace_dir, exist_ok=True)
+                trace_file = os.path.join(trace_dir, f"{rule_name}_{safe_path}.log")
+                with open(trace_file, "w", encoding="utf-8") as f:
+                    f.write("\n".join(current_traces))
+                
+                rel_trace_p = os.path.relpath(trace_file, os.getcwd())
+                hint = f"💡 Analyse-Hilfe: Öffne die Log-Datei '{rel_trace_p}', um den detaillierten Ausführungsplan dieses Prozessors zu sehen."
+                
+                # Show hint as INFO (doesn't affect success status)
+                # We show it if errors occurred OR if we are in verbose mode
+                if findings or self.verbose or crashed:
+                    self._add_results("INFO", target_path, [hint], origin=origin)
+
+            # 2. Add real findings (errors/warnings)
+            if findings:
+                is_global_warning = (not crashed and target_path == ".")
+                severity = "WARNING" if is_global_warning else "ERROR"
+                self._add_results(severity, target_path, findings, origin=origin)
+                
+        return findings
 
     def _add_results(self, severity: str, full_rel_path: str, results: List[str], origin: Optional[Dict[str, Any]] = None) -> None:
         if not results: return
         parts = full_rel_path.split('/') if full_rel_path not in ['.', ''] else ['root']
         current_node = self.results_tree
         for part in parts: current_node = current_node[part]
-        if '_errors' not in current_node: current_node['_errors'], current_node['_warnings'] = [], []
+        if '_errors' not in current_node: 
+            current_node['_errors'] = []
+            current_node['_warnings'] = []
+            current_node['_infos'] = []
+            
         for msg in results:
             entry = {'msg': msg, 'origin': origin}
             if severity == "ERROR":
                 if entry not in current_node['_errors']: current_node['_errors'].append(entry); self.total_errors += 1
-            else:
+            elif severity == "WARNING":
                 if entry not in current_node['_warnings']: current_node['_warnings'].append(entry); self.total_warnings += 1
+            else: # INFO
+                if entry not in current_node['_infos']: current_node['_infos'].append(entry)
 
     def _print_node(self, name: str, node: Any, indent: int = 0) -> None:
         prefix = "   " * indent
-        if name and name not in ["_errors", "_warnings"]:
+        if name and name not in ["_errors", "_warnings", "_infos"]:
             print(f"{prefix}{'📄' if '.' in name else '📁'} {name}{'/' if '.' not in name else ''}")
             indent += 1
             prefix = "   " * indent
         
-        # Gruppierung der Warnungen nach Prozessor
-        warn_groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        for w in cast(List[Dict[str, Any]], node.get('_warnings', [])):
-            origin = cast(Optional[Dict[str, Any]], w.get('origin'))
-            origin_key = f"{origin['module']}:{origin['method']}" if origin else "system"
-            warn_groups[origin_key].append(w)
-            
-        for origin_key, items in warn_groups.items():
-            if origin_key != "system":
-                o = cast(Dict[str, Any], items[0]['origin'])
-                print(f"{prefix}⚙️ {o['module']}:{o['method']}")
-                for item in items:
-                    print(f"{prefix}   ⚠️ {item['msg']}")
-            else:
-                for item in items:
-                    print(f"{prefix}⚠️ {item['msg']}")
-
-        # Gruppierung der Fehler nach Prozessor
-        err_groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        # Processor-spezifische Meldungen sammeln
+        processor_groups: Dict[str, Dict[str, List[str]]] = defaultdict(lambda: {'errors': [], 'warnings': [], 'infos': []})
+        
         for e in cast(List[Dict[str, Any]], node.get('_errors', [])):
             origin = cast(Optional[Dict[str, Any]], e.get('origin'))
-            origin_key = f"{origin['module']}:{origin['method']}" if origin else "system"
-            err_groups[origin_key].append(e)
+            okey = f"{origin['module']}:{origin['method']}" if origin else "system"
+            processor_groups[okey]['errors'].append(e['msg'])
             
-        for origin_key, items in err_groups.items():
-            if origin_key != "system":
-                o = cast(Dict[str, Any], items[0]['origin'])
-                print(f"{prefix}⚙️ {o['module']}:{o['method']}")
-                for item in items:
-                    print(f"{prefix}   ❌ {item['msg']}")
+        for w in cast(List[Dict[str, Any]], node.get('_warnings', [])):
+            origin = cast(Optional[Dict[str, Any]], w.get('origin'))
+            okey = f"{origin['module']}:{origin['method']}" if origin else "system"
+            processor_groups[okey]['warnings'].append(w['msg'])
+            
+        for i in cast(List[Dict[str, Any]], node.get('_infos', [])):
+            origin = cast(Optional[Dict[str, Any]], i.get('origin'))
+            okey = f"{origin['module']}:{origin['method']}" if origin else "system"
+            processor_groups[okey]['infos'].append(i['msg'])
+            
+        for okey, group in sorted(processor_groups.items()):
+            if okey != "system":
+                print(f"{prefix}⚙️ {okey}")
+                p_indent = prefix + "   "
+                for msg in group['errors']: print(f"{p_indent}❌ {msg}")
+                for msg in group['warnings']: print(f"{p_indent}⚠️ {msg}")
+                for msg in group['infos']: print(f"{p_indent}{msg}")
             else:
-                for item in items:
-                    print(f"{prefix}❌ {item['msg']}")
+                for msg in group['errors']: print(f"{prefix}❌ {msg}")
+                for msg in group['warnings']: print(f"{prefix}⚠️ {msg}")
+                for msg in group['infos']: print(f"{prefix}{msg}")
 
         for child_name, child_node in sorted(node.items()):
-            if child_name not in ['_errors', '_warnings']: self._print_node(child_name, child_node, indent)
+            if child_name not in ['_errors', '_warnings', '_infos']: self._print_node(child_name, child_node, indent)
 
     def print_report(self) -> bool:
         print("\n" + "="*70 + "\n🛡️  AEDICORE ARCHITECT 🛡️\n" + "="*70 + "\n")

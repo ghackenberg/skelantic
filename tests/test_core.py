@@ -184,8 +184,10 @@ def test_run_templates_match_failure(tmp_path: Any) -> None:
         instance.match.return_value = (False, ["error1"], {})
         instance.trace_log = ["trace1"]
         engine._run_templates(files_data)
-        assert engine.total_errors == 3
+        # 2 errors (Struktur-Fehler + error1) and 1 info
+        assert engine.total_errors == 2
         assert any("error1" in e['msg'] for e in engine.results_tree["file.md"]["_errors"])
+        assert any("Analyse-Hilfe" in i['msg'] for i in engine.results_tree["file.md"]["_infos"])
 def test_run_phase(tmp_path: Any) -> None:
     engine = LinterEngine(registry, models_module="test_models")
     file_path = tmp_path / "test.md"
@@ -210,8 +212,10 @@ def test_run_phase(tmp_path: Any) -> None:
         mock_exec.assert_called_once()
 
 def test_execute_rule_success_and_crash() -> None:
+    import pathlib
     engine = LinterEngine(registry, models_module="test_models")
     node = MagicMock()
+    node.rel_path = pathlib.Path("path/to/file.md")
     node.document = MagicMock()
 
     def dummy_rule(node: Any, tracer: Any) -> List[str]: 
@@ -224,15 +228,18 @@ def test_execute_rule_success_and_crash() -> None:
     with patch('os.makedirs'):
         with patch('builtins.open', mock_open()):
             engine._execute_rule(dummy_rule, "dummy_rule", node, f_data)
-    assert engine.total_errors == 2
+    # 1 error (warning 1) and 1 info
+    assert engine.total_errors == 1
     assert any("warning 1" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
+    assert any("Analyse-Hilfe" in i['msg'] for i in engine.results_tree['path']['to']['file.md']["_infos"])
     
     # Test crash
     def crash_rule(node: Any, tracer: Any) -> None:
         raise ValueError("boom")
         
     engine._execute_rule(crash_rule, "crash_rule", node, f_data)
-    assert engine.total_errors == 3
+    # 2nd error + 1 more info
+    assert engine.total_errors == 2
     assert any("Crash 'crash_rule': boom" in e['msg'] for e in engine.results_tree['path']['to']['file.md']["_errors"])
 
 def test_run_phase_with_root_processor() -> None:
