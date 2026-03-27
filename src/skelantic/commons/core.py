@@ -340,7 +340,7 @@ class LinterEngine:
             if child_name not in ['_errors', '_warnings', '_infos']: self._print_node(child_name, child_node, indent)
 
     def print_report(self) -> bool:
-        print("\n" + "="*70 + "\n🛡️  AEDICORE ARCHITECT 🛡️\n" + "="*70 + "\n")
+        print("\n" + "="*70 + "\n🛡️  SKELANTIC ARCHITECT 🛡️\n" + "="*70 + "\n")
         if not self.results_tree: print("✨ PERFECT REPOSITORY: 0 Errors, 0 Warnings."); return False
         for top_level, node in sorted(self.results_tree.items()): self._print_node(top_level, node)
         print("\n" + "="*70)
