@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, TypedDict, Pattern, cast
 from .documents import MarkdownDocument, Document
 from .context import LinterContext
 from skelantic.templates.matcher import SkeletalMatcher
-from .config import ConfigLoader, get_regex
+from .config import ConfigLoader, get_regex, RESERVED_NAMES
 from .decorators import Registry
 
 class MatcherDict(TypedDict):
@@ -365,7 +365,6 @@ class LinterEngine:
 
         try: entries = os.listdir(current_dir)
         except PermissionError: return
-        hard_ignore = {".git", "node_modules", "venv", "__pycache__", ".skelantic", ".pytest_cache", ".mypy_cache", "linter.yaml", ".coverage"}
         config_dir = rel_path
         
         # New Config Loading
@@ -384,7 +383,7 @@ class LinterEngine:
 
         filtered_entries: List[str] = []
         for e in entries:
-            if e in hard_ignore or e.endswith('.pyc'):
+            if e in RESERVED_NAMES or e.endswith('.pyc'):
                 continue
             e_rp = e if rel_path == "." else f"{rel_path}/{e}"
             if any(p.match(e_rp) or p.match(e) for p in ignore_patterns):

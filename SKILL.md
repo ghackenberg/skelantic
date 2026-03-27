@@ -1,6 +1,6 @@
 ---
 name: skelantic
-description: "Skelantic strictly governs this repository's architecture. CRITICAL RULES: 1. You MUST run `skelantic verify` after every modification to ensure architectural, type, and logic integrity. 2. NEVER create files or directories that are not explicitly allowed in a `.skelantic/config.yaml`. 3. If any step in verify fails, follow the 'Recommended action' provided by the CLI. Activate this skill for detailed instructions."
+description: "Skelantic strictly governs this repository's architecture. CRITICAL RULES: 1. You MUST run `skelantic verify` after every modification. 2. NEVER create files or directories not allowed in `config.yaml`. 3. DO NOT define configuration for reserved/ignored names like `.skelantic` or `__pycache__`. 4. If any step in verify fails, follow the 'Recommended action'. Activate this skill for detailed instructions."
 ---
 
 # 🛡️ Skelantic Agent Skill
@@ -13,6 +13,7 @@ You are an expert at managing repositories governed by the Skelantic framework. 
 2. **No Wildcards:** Do NOT use `*` or `**` in `files` or `directories` keys in `config.yaml`. Use typed variables instead.
 3. **No Deep Paths:** Keys in `config.yaml` cannot contain slashes (`/`). Use nested YAML structures or cascading configs.
 4. **Pure Processors:** Python `@processor` functions must never perform I/O operations (like `os.path` or `open`). Rely entirely on the injected `node` and its `document` or `data` properties.
+5. **Reserved Names:** NEVER define rules for `.git`, `node_modules`, `venv`, `__pycache__`, `.skelantic`, `.pytest_cache`, `.mypy_cache`, `linter.yaml`, or `.coverage` in your `config.yaml`. These are automatically ignored by Skelantic and will cause validation errors if used in configuration.
 
 ## 🔄 Core Workflows
 

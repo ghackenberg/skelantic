@@ -3,6 +3,8 @@ import re
 import yaml
 from typing import Any, Callable, Dict, Pattern, List, Match, cast
 
+RESERVED_NAMES = {".git", "node_modules", "venv", "__pycache__", ".skelantic", ".pytest_cache", ".mypy_cache", "linter.yaml", ".coverage"}
+
 class ConfigLoader:
     def __init__(self, add_results_callback: Callable[[str, str, List[str]], None]) -> None:
         self.add_results = add_results_callback
@@ -39,6 +41,9 @@ class ConfigLoader:
                     self._validate_node_config(sub_v, config_path, sub_k, is_directory=True)
 
     def _validate_node_config(self, config: Any, config_path: str, node_name: str, is_directory: bool = False) -> None:
+        if node_name in RESERVED_NAMES:
+            self.add_results("ERROR", config_path, [f"Der Name '{node_name}' wird von Skelantic standardmäßig ignoriert und darf nicht in der Konfiguration definiert werden."])
+        
         if '*' in node_name:
             self.add_results("ERROR", config_path, [f"Wildcards ('*') sind in Dateinamen nicht mehr erlaubt: '{node_name}'. Nutze stattdessen Variablen wie '{{name:char}}.md'."])
         if '/' in node_name:

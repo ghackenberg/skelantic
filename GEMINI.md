@@ -29,6 +29,7 @@ The repository uses modern Python standards. Every change must meet the followin
 * **AI Migration Protocol:** If you are asked to upgrade a repository to a newer version of Skelantic, ALWAYS execute `skelantic migrate` in the root of the target repository FIRST. This will provide you with the exact XML system prompts and refactoring steps required to update the user's processors.
 * **FORBIDDEN (I/O in the Parser):** The integration of file system calls in the `SkeletalMatcher` classes or the generic `TemplateParser`.
 * **FORBIDDEN (Untyped Data/State):** The engine natively generates a strongly-typed `RepoGraph` class mirroring the repository, allowing developers to type-hint their processors (`node: RepoGraph.Docs.ReadmeMd`). It also provides Dependency Injection for states. Avoid raw dictionaries (`Dict[str, Any]`) at all costs. Always prefer generating new types or relying on injected Pydantic BaseModels for global state.
+* **FORBIDDEN (Configuring Reserved Names):** Never allow users to define configuration rules for reserved names (e.g., `.skelantic`, `__pycache__`) in `config.yaml`. These must be validated during loading to provide clear feedback.
 
 ## Language and Communication Guidelines
 * Since the main developer (Dr. Georg Hackenberg) is German-speaking, architectural discussions and planning are conducted in German by default.

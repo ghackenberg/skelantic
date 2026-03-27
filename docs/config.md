@@ -42,6 +42,24 @@ directories:
             optional: true
 ```
 
+## Reserved Names (Hard Ignores)
+
+Skelantic automatically ignores certain system directories and files to avoid common pitfalls and noise. These names are **strictly forbidden** in your `config.yaml` because the engine never sees them during traversal.
+
+The following names are reserved and cannot be defined in a configuration:
+
+* `.git`
+* `node_modules`
+* `venv`
+* `__pycache__`
+* `.skelantic` (The configuration folder itself)
+* `.pytest_cache`
+* `.mypy_cache`
+* `linter.yaml`
+* `.coverage`
+
+If you try to include any of these in your `files` or `directories` section, the Skelantic engine will raise a validation error.
+
 ## File Configuration
 
 When configuring a file within the `files` section, the following keys are allowed:
